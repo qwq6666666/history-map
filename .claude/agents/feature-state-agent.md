@@ -14,6 +14,7 @@ model: sonnet
 - 進階比對與多層疊加：`src/features/compareMode.js`、`src/features/multiOverlay.js`、`src/core/multiOverlayManager.js`
 - 繪圖工具與位置功能：`src/drawTool.js`、`src/features/location.js`
 - 外部圖資匯入與搜尋：`src/features/wmtsImport.js`、`src/features/search.js`
+- 地圖點位互動：`src/features/identifyPin.js`（免開關落點探針 Identify Pin，含三態點擊防禦狀態機）
 
 # 核心工作準則
 1. **狀態機與模式管理 (State & Mode Transitions)：**
@@ -25,4 +26,4 @@ model: sonnet
 
 # 驗證規範
 - 修改後執行對應的功能規格測試：
-  `node tests/run-all.mjs tests/specs/store-and-modes.test.mjs tests/specs/multi-overlay.test.mjs tests/specs/draw-tool.test.mjs tests/specs/wmts-import.test.mjs`
+  `node tests/run-all.mjs tests/specs/store-and-modes.test.mjs tests/specs/multi-overlay.test.mjs tests/specs/draw-tool.test.mjs tests/specs/wmts-import.test.mjs tests/specs/identify-pin.test.mjs`

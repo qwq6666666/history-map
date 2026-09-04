@@ -21,7 +21,7 @@
 | :--- | :--- | :--- |
 | 地圖底層、圖磚容錯、座標換算 | `map-core-agent` | `src/mapCore.js`, `src/core/`, `src/tileChecker.js`, `src/geocode.js` |
 | 介面樣式、RWD、側邊欄、時間軸滑桿 | `ui-frontend-agent` | `index.html`, `style.css`, `src/ui/`, `src/timelineUI.js`, `src/sidebarUI.js` |
-| 模式切換、雙圖比對、繪圖工具、Store | `feature-state-agent` | `src/features/`, `src/store.js`, `src/drawTool.js` |
+| 模式切換、雙圖比對、繪圖工具、Store、地圖落點探針 | `feature-state-agent` | `src/features/`（含 `identifyPin.js`）, `src/store.js`, `src/drawTool.js` |
 | 圖層 JSON、地名映射、圖資打包 | `data-processing-agent` | `data/layers/`, `data/historical-names.json`, `tools/` |
 | 整合回歸測試、品質把關 | `qa-testing-agent` | `tests/` |
 
@@ -29,3 +29,6 @@
 1. **原生 ESM 架構：** 保持純原生 JavaScript ES Module，非必要絕不安裝任何重型 npm 第三方依賴。
 2. **資料管線同步：** 凡異動 `data/layers/*.json`（尤其新增圖層），完成後必須先執行 `node tools/tag-layer-types.js` 自動打標 type，再執行 `node tools/build-layers-bundle.js` 重新打包。
 3. **驗證先行：** 所有邏輯或狀態修改，結束前必須執行對應的測試檔確認通過，嚴禁留下未驗證的 break changes。
+4. **Subagent 權責清單同步 (Role Whitelist Sync)：** 上表是概略路由，各 subagent 實際遵守的是 `.claude/agents/<name>.md` 裡「你僅能檢視與修改」逐檔列舉的白名單——這份清單比本表嚴格，且**不會**因為新檔案落在該 agent 負責的目錄下就自動視為已授權。
+   - 新增 `src/features/`、`src/core/` 等目錄下的檔案時，主代理當下就要把該檔案路徑加進對應 `.claude/agents/<name>.md` 的權責清單，不要留給下一輪任務才補。
+   - 若某 subagent 以「不在白名單」拒絕明明屬於其目錄的檔案（即使是它自己前幾輪建立的），代表清單漏列而非任務指派錯誤：主代理應先把該路徑補進對應 `.claude/agents/*.md`，而不是重複用同一個訊息說服 subagent 擴權（subagent 不應該、也不會接受單純的口頭再授權）。若時間急迫可由主代理直接以 `Edit` 完成該次修改，事後仍要記得補寫清單，避免下次重蹈覆轍。

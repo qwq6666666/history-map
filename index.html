@@ -46,6 +46,14 @@
 <div id="locateMarker" class="locate-marker"><div class="locate-marker-dot"></div></div>
 <div id="addressMarker" class="address-marker"><div class="address-marker-pin"></div></div>
 
+<div id="identifyPin" class="identify-pin">
+  <div id="identifyPopup" class="identify-popup" hidden>
+    <button type="button" id="identifyPopupClose" class="identify-popup-close" aria-label="關閉">×</button>
+    <div id="identifyPopupBody" class="identify-popup-body"></div>
+  </div>
+  <button type="button" id="identifyPinMarker" class="identify-pin-marker" aria-label="開啟座標資訊"></button>
+</div>
+
 <div class="floating-opacity" id="floatingOpacity">
   <span class="field-label">透明度</span>
   <input type="range" id="floatingOpacitySlider" min="0" max="100" value="100">

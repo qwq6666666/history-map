@@ -20,7 +20,7 @@ import { buildCategoryList, appendLayerList } from '../uiTree.js';
 import { map } from '../core/map.js';
 import { showLocateToast } from '../features/location.js';
 import { syncActiveLayerItemClasses } from '../core/layerManager.js';
-import { findAvailableLayersAt, activateFromSearch, bumpSearchToken, isSearchStale, SEARCH_ZOOM, sortAvailableByYear, groupAvailableByType, splitAvailableByYearKnown } from '../features/search.js';
+import { findAvailableLayersAt, activateFromSearch, bumpSearchToken, isSearchStale, SEARCH_ZOOM, sortAvailableByYear, groupAvailableByType, splitAvailableByYearKnown, buildCoordInfoElement } from '../features/search.js';
 
 let addressInput, addressSearchBtn, addressSuggestEl, locationResultEl, locationNameEl,
     layerAvailPanelEl, clearLocationBtn, addressMarkerEl, addressMarkerOverlay, locateSearchBtn;
@@ -84,7 +84,7 @@ async function runImmediateSearch(){
 // 共用流程：把地圖移到指定經緯度、標示圖釘、顯示搜尋結果面板，再逐筆確認可用圖層。
 // 地址搜尋（selectGeocodeResult）與定位搜尋（locateSearchBtn）最終都會走到這裡，
 // 差別只在座標與地址元件的來源不同（Nominatim 正向地理編碼 vs. 瀏覽器定位+反向地理編碼）。
-async function showLocationAndFindLayers(lon, lat, label, addr){
+export async function showLocationAndFindLayers(lon, lat, label, addr){
   const coord = ol.proj.fromLonLat([lon, lat]);
   const view = map.getView();
   view.animate({ center: coord, zoom: Math.max(view.getZoom(), SEARCH_ZOOM), duration: 600 });
@@ -92,6 +92,9 @@ async function showLocationAndFindLayers(lon, lat, label, addr){
 
   locationResultEl.style.display = 'block';
   locationNameEl.textContent = label;
+  // 每次重新搜尋都要先移除舊的座標資訊區塊，避免重複搜尋時在卡片內堆疊。
+  locationResultEl.querySelector('.coord-info')?.remove();
+  locationResultEl.appendChild(buildCoordInfoElement(lat, lon));
   await findAndRenderAvailableLayers(lon, lat, addr || {});
 }
 

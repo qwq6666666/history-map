@@ -251,6 +251,10 @@ function doCapture(){
   }
 }
 
+/** 供其他模組（例如免開關落點探針 identifyPin.js）查詢目前是否有
+ * 繪圖工具啟用中，避免兩者互相搶點擊事件。 */
+export function isDrawToolActive(){ return !!currentTool; }
+
 /** main.js 啟動流程呼叫一次即可。 */
 export function initDrawTool(){
   vectorSource = new ol.source.Vector();
