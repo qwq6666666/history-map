@@ -205,6 +205,36 @@ export function sortAvailableByYear(available, direction = 'desc'){
   return withYear.concat(withoutYear);
 }
 
+// 「類型」頁籤用的分組結果標籤，null／不在 SEARCH_RESULT_TYPES 裡的一律歸入這組
+export const SEARCH_RESULT_TYPE_OTHER = '其他';
+
+// 依類型把 available 陣列分組，固定回傳 4 組（SEARCH_RESULT_TYPES 三種 +
+// 最後一組 SEARCH_RESULT_TYPE_OTHER），每組是 { type, items }，items 可能是
+// 空陣列，是否要跳過空群組交給呼叫端 UI 決定。不 mutate 傳入的 available。
+export function groupAvailableByType(available){
+  const groups = SEARCH_RESULT_TYPES.map(type => ({ type, items: [] }));
+  const otherGroup = { type: SEARCH_RESULT_TYPE_OTHER, items: [] };
+  const groupByType = new Map(groups.map(g => [g.type, g]));
+  available.forEach(c => {
+    const g = groupByType.get(c.layer.type);
+    (g || otherGroup).items.push(c);
+  });
+  groups.push(otherGroup);
+  return groups;
+}
+
+// 依「年代是否已知」拆分 available 陣列，用 layer.yearNum 是否為 null 判斷，
+// 邏輯跟 sortAvailableByYear 篩 null 的方式一致。known 之後可直接丟進
+// sortAvailableByYear(known, direction) 排序。不 mutate 傳入的 available。
+export function splitAvailableByYearKnown(available){
+  const known = [];
+  const unknown = [];
+  available.forEach(c => {
+    (c.layer.yearNum == null ? unknown : known).push(c);
+  });
+  return { known, unknown };
+}
+
 // 從搜尋結果點選圖層：若目前在左右比對模式，先切回透明疊圖模式，
 // 再沿用跟主清單共用的 selectOverlayLayer（會一併同步兩個面板的高亮狀態）
 export function activateFromSearch(src, layer){

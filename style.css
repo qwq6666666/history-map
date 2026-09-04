@@ -170,6 +170,24 @@
   .layer-year{font-family:var(--serif); font-size:12px; color:var(--rule); width:40px; flex-shrink:0;}
   .layer-title{font-size:12.5px; color:var(--ink); line-height:1.35;}
 
+  /* 單一分類／次分類底下圖層數過多時，預設只顯示前 8 筆（見 uiTree.js
+     appendLayerList()），其餘項目先隱藏，避免手風琴展開後清單過長。不用
+     overflow-y:auto 局部捲軸（外層側邊欄本身已經在捲動了，容器不該再自己
+     長出第二層捲軸），純粹用 display 切換，展開後容器自然撐高。 */
+  .layer-item-overflow{display:none;}
+  .category-body.expanded .layer-item-overflow,
+  .subcategory-body.expanded .layer-item-overflow,
+  .avail-layer-list.expanded .layer-item-overflow{display:flex;}
+  .layer-list-toggle{
+    display:block; width:calc(100% - 8px); margin:4px 4px 2px 18px;
+    padding:5px 8px; text-align:center;
+    background:var(--paper-dim); color:var(--brass-dark);
+    border:1px dashed var(--rule); border-radius:2px;
+    font-family:var(--sans); font-size:11.5px; font-weight:600;
+    cursor:pointer; transition:background .12s ease, color .12s ease;
+  }
+  .layer-list-toggle:hover{background:var(--brass-dark); color:var(--paper);}
+
   /* 次分類（例：廳底下再依「堡」分一層）手風琴，樣式較 .category 淡一階 */
   .subcategory{border-top:1px dashed var(--rule); margin-left:6px;}
   .subcategory:first-child{border-top:none;}
@@ -405,26 +423,38 @@
   .avail-progress{font-size:11.5px; color:var(--rule); padding:4px 2px;}
   .avail-empty{font-size:12px; color:var(--rule); line-height:1.6; padding:4px 2px; margin:0 0 4px;}
 
-  /* 搜尋結果面板頂端的「類型篩選／年代排序」工具列，純前端在已取得的
-     available 陣列上過濾／重排，視覺上沿用 .segmented／.source-head 那套
-     淡雅、方形邊框的語彙，維持跟結果清單協調。 */
-  .avail-filter-toolbar{
-    display:flex; flex-direction:column; gap:6px;
-    margin:0 0 10px; padding:6px 4px; border:1px solid var(--paper-dim); border-radius:2px;
-    background:var(--paper-dim);
+  /* 搜尋結果面板頂端的「全部／類型／年代」頁籤列：純前端在已取得的
+     available 陣列上重新分組／排序，視覺上沿用 .segmented 那套淡雅、
+     方形邊框的語彙，維持跟結果清單協調。允許在窄側邊欄換行，避免爆版。 */
+  .avail-tabs{
+    display:flex; flex-wrap:wrap; border:1px solid var(--rule); border-radius:2px;
+    overflow:hidden; margin:0 0 10px;
   }
-  .avail-filter-row{display:flex; flex-wrap:wrap; align-items:center; gap:6px;}
-  .avail-filter-label{
-    font-size:11px; color:var(--rule); flex-shrink:0; width:32px;
+  .avail-tab-btn{
+    flex:1 1 64px; min-width:0; background:var(--paper); border:none; border-right:1px solid var(--rule);
+    padding:6px 4px; font-family:var(--sans); font-size:12px; color:var(--ink);
+    cursor:pointer; white-space:normal; text-align:center; line-height:1.3;
+    transition:background .15s ease, color .15s ease;
   }
-  .avail-filter-btn{
+  .avail-tab-btn:last-child{border-right:none;}
+  .avail-tab-btn:hover{background:var(--paper-dim);}
+  .avail-tab-btn.active{background:var(--ink); color:var(--paper);}
+
+  /* 「年代」頁籤內自己的排序切換（新至舊／舊至新），比頁籤本身淡一階 */
+  .avail-year-sort{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 8px;}
+  .avail-year-sort-btn{
     background:var(--paper); border:1px solid var(--rule); border-radius:2px;
     padding:4px 9px; font-family:var(--sans); font-size:11.5px; color:var(--ink);
     cursor:pointer; white-space:nowrap;
     transition:background .15s ease, color .15s ease, border-color .15s ease;
   }
-  .avail-filter-btn:hover{border-color:var(--brass-dark); color:var(--brass-dark);}
-  .avail-filter-btn.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .avail-year-sort-btn:hover{border-color:var(--brass-dark); color:var(--brass-dark);}
+  .avail-year-sort-btn.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+
+  /* 【類型】／【年代】頁籤攤平列出圖層（不巢狀在 .category-body 底下），
+     .layer-item 本身的樣式是全域規則、不依賴巢狀父層即可正常呈現，這裡只需
+     微調左側留白，跟 .source-body 既有的 padding-left 疊加起來不會太擠。 */
+  .avail-layer-list .layer-item{padding-left:4px;}
 
   /* 時間軸模式（timelineMode.js）專用樣式，搜尋結果面板已不再使用時間軸檢視 */
   .timeline-scroll{overflow-x:auto; padding:4px 2px 8px; -webkit-overflow-scrolling:touch;}
@@ -464,7 +494,6 @@
     padding:8px 2px 3px; border-top:1px dashed var(--rule); margin-top:4px;
   }
   .avail-source-label:first-child{border-top:none; margin-top:0;}
-  .avail-layer-list .layer-item{padding-left:4px;}
 
   /* 地址搜尋定位圖釘（區別於藍色定位圓點） */
   .address-marker{position:absolute; z-index:8; width:22px; height:28px; display:none; pointer-events:none;}
