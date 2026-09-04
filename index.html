@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>臺灣百年歷史地圖疊圖器</title>
+
+<!-- Content Security Policy：靜態網站（GitHub Pages 等）用 meta 形式設定。
+     img-src / connect-src 使用較寬鬆的 https: 而非逐一列舉 WMTS 網域，
+     因為歷史圖資來源會持續新增（見 data/layers/*.json），核心的
+     「禁止任意 URL 請求」把關已在應用層（src/data.js 的 key 白名單機制）
+     完成，這裡是多一層防禦深度，不是唯一防線。
+     style-src 保留 'unsafe-inline' 是因為 OpenLayers 與部分 UI 程式碼
+     會用行內 style 屬性（element.style.xxx）；script-src 沒有加
+     'unsafe-inline'，因為全站沒有任何 inline <script>。 -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' https://cdn.jsdelivr.net;
+  style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com;
+  font-src https://fonts.gstatic.com;
+  img-src 'self' data: blob: https:;
+  connect-src 'self' https://nominatim.openstreetmap.org https:;
+  object-src 'none';
+  base-uri 'self';
+  frame-ancestors 'none';
+">
+
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v9.2.4/ol.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="./style.css?v=2">
+</head>
+<body>
+
+<div id="map"></div>
+
+<button type="button" id="locateBtn" class="locate-btn" title="定位到目前位置">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3"></circle>
+    <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+  </svg>
+</button>
+<div id="locateToast" class="locate-toast"></div>
+<div id="locateMarker" class="locate-marker"><div class="locate-marker-dot"></div></div>
+<div id="addressMarker" class="address-marker"><div class="address-marker-pin"></div></div>
+
+<div class="floating-opacity" id="floatingOpacity">
+  <span class="field-label">透明度</span>
+  <input type="range" id="floatingOpacitySlider" min="0" max="100" value="100">
+  <span class="opacity-val" id="floatingOpacityVal">100%</span>
+</div>
+
+<div class="compare-float-item" id="compareWrapA">
+  <span class="side-dot a"></span>
+  <div class="layer-picker">
+    <button type="button" class="layer-picker-btn" id="pickerBtnA">
+      <span class="picker-btn-label" id="pickerLabelA"></span>
+      <span class="picker-btn-arrow">▾</span>
+    </button>
+    <div class="layer-picker-panel" id="pickerPanelA"></div>
+  </div>
+</div>
+<div class="compare-float-item" id="compareWrapB">
+  <span class="side-dot b"></span>
+  <div class="layer-picker">
+    <button type="button" class="layer-picker-btn" id="pickerBtnB">
+      <span class="picker-btn-label" id="pickerLabelB"></span>
+      <span class="picker-btn-arrow">▾</span>
+    </button>
+    <div class="layer-picker-panel" id="pickerPanelB"></div>
+  </div>
+</div>
+<div id="swipeDivider">
+  <div id="swipeLine"></div>
+  <div id="swipeHandle">⇔</div>
+</div>
+
+<button type="button" id="drawToggleBtn" class="draw-toggle-btn" title="繪圖工具">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+    <path d="M2 2l7.586 7.586"></path>
+    <circle cx="11" cy="11" r="2"></circle>
+  </svg>
+</button>
+<div id="drawToolbar" class="draw-toolbar">
+  <div class="draw-toolbar-row">
+    <button type="button" class="draw-tool-btn" data-tool="select" title="選取／編輯已畫的圖形">選取</button>
+    <button type="button" class="draw-tool-btn" data-tool="point" title="標記點（可加文字說明）">點</button>
+    <button type="button" class="draw-tool-btn" data-tool="line" title="畫線（自動顯示長度）">線</button>
+    <button type="button" class="draw-tool-btn" data-tool="polygon" title="畫面（自動顯示面積）">面</button>
+  </div>
+  <div class="draw-toolbar-row">
+    <button type="button" id="drawDeleteBtn" class="draw-tool-btn" title="刪除目前選取的圖形">刪除</button>
+    <button type="button" id="drawClearBtn" class="draw-tool-btn draw-tool-btn-danger" title="清除全部繪製內容">清空</button>
+    <button type="button" id="drawExportGeoJSONBtn" class="draw-tool-btn draw-tool-btn-wrap" title="匯出成 GeoJSON 檔案並下載，可匯入 QGIS／ArcGIS 等 GIS 軟體">匯出<br>GeoJSON</button>
+    <button type="button" id="drawExportImageBtn" class="draw-tool-btn draw-tool-btn-wrap" title="把目前地圖畫面（含底圖與繪製內容）匯出成 PNG 圖片並下載">地圖<br>截圖</button>
+  </div>
+</div>
+
+<div id="stamp">
+  <div class="stamp-year" id="stampYear"></div>
+  <div class="stamp-label" id="stampLabel"></div>
+</div>
+
+<div id="mapTimelineBar">
+  <div class="map-timeline-bar-head">
+    <div class="map-timeline-scale-switch" id="mapTimelineScaleSwitch">
+      <button type="button" data-scale="25k" class="active">1:25,000</button>
+      <button type="button" data-scale="50k">1:50,000</button>
+      <button type="button" data-scale="mix">混合</button>
+    </div>
+    <button type="button" id="mapTimelineRefreshBtn" class="map-timeline-refresh-btn">重新整理</button>
+  </div>
+  <div class="map-timeline-bar-inner" id="mapTimelineBarInner"></div>
+</div>
+
+<div id="multiOverlayBar">
+  <div class="multi-overlay-bar-head">
+    <span class="map-timeline-hint">已選圖層（越上面疊越上層）</span>
+    <button type="button" id="multiOverlayClearBtn" class="map-timeline-refresh-btn">全部清除</button>
+  </div>
+  <div class="multi-overlay-bar-inner" id="multiOverlayBarInner"></div>
+</div>
+
+<div id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-header-text">
+      <h1>百年歷史疊圖器</h1>
+    </div>
+    <button id="toggleSidebar" title="收合面板">◂</button>
+  </div>
+
+  <div class="sidebar-body">
+    <div class="opacity-block" id="opacityBlock">
+      <div class="field-label">歷史圖層透明度</div>
+      <div class="opacity-row">
+        <input type="range" id="opacitySlider" min="0" max="100" value="100">
+        <span class="opacity-val" id="opacityVal">100%</span>
+      </div>
+      <button class="clear-btn" id="clearBtn">清除疊圖</button>
+    </div>
+
+    <div class="search-block">
+      <div class="field-label">搜尋地址</div>
+      <div class="search-row">
+        <input type="text" id="addressInput" class="address-input" placeholder="輸入地址、地標或路口" autocomplete="off">
+        <button type="button" id="locateSearchBtn" class="address-search-btn locate-search-btn" title="使用目前位置尋找圖層">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+          </svg>
+        </button>
+        <button type="button" id="addressSearchBtn" class="address-search-btn" title="搜尋地址">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="M21 21l-4.3-4.3"></path>
+          </svg>
+        </button>
+      </div>
+      <div id="addressSuggest" class="address-suggest"></div>
+      <div id="locationResult" class="location-result" style="display:none;">
+        <div class="location-result-head">
+          <span id="locationName" class="location-name"></span>
+          <button type="button" id="clearLocationBtn" class="location-clear-btn" title="清除搜尋">✕</button>
+        </div>
+        <div id="layerAvailPanel" class="layer-avail-panel"></div>
+      </div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button data-mode="overlay" class="active">透明疊圖</button>
+      <button data-mode="compare">左右比對</button>
+      <button data-mode="timeline">時間軸</button>
+      <button data-mode="multi">複合疊圖</button>
+    </div>
+
+    <div id="overlayPanel">
+      <div class="field-label">底圖</div>
+      <div class="segmented" id="baseSwitch">
+        <button data-base="osm" class="active">現代地圖</button>
+        <button data-base="sat">衛星影像</button>
+      </div>
+
+      <div id="categories"></div>
+    </div>
+
+    <div id="comparePanel">
+      <p class="compare-hint">左右兩側要比對的圖層選單已移到地圖下方，收合側邊欄也能直接切換。拖曳地圖上的圓形把手，左右滑動比對兩個圖層的差異，任何底圖或歷史圖層都可以自由搭配。</p>
+    </div>
+
+    <div id="timelinePanel">
+      <p class="compare-hint">依年代瀏覽「台灣百年歷史地圖」精細地形圖系列：時間軸已移到地圖下方，可切換 1:25,000／1:50,000／混合兩者。會依目前地圖畫面中心點列出可用年份，可拖曳搖桿、點選年份圓點，或按「播放」自動依序播放。地圖移動後不會自動重新整理，按浮動列上的「重新整理」才會更新。</p>
+    </div>
+
+    <div id="multiPanel">
+      <p class="compare-hint">從下面清單勾選要一起疊加的歷史地圖，可以勾多張。已選圖層清單在地圖下方，可以各自調整透明度、疊放順序，或移除。</p>
+
+      <div class="custom-source-block" id="customSourceBlock">
+        <div class="field-label">自訂 WMTS／XYZ 圖層</div>
+
+        <div class="custom-source-tabs" id="customSourceTabs">
+          <button type="button" data-tab="manual" class="active">手動貼網址</button>
+          <button type="button" data-tab="wmts">從 WMTS 服務匯入</button>
+        </div>
+
+        <div id="customSourceManualPanel">
+          <p class="custom-source-hint">貼上圖磚服務網址（需包含 {z}/{x}/{y} 佔位符），一次只能加一張。適合單張圖層、或不是標準 WMTS 服務的圖磚來源。</p>
+          <div class="custom-source-form">
+            <input type="text" id="customSourceName" class="custom-source-input" placeholder="名稱（例如：日本 GSI 地形圖）" autocomplete="off">
+            <input type="text" id="customSourceUrl" class="custom-source-input" placeholder="網址樣板，例如 https://example.com/{z}/{x}/{y}.png" autocomplete="off">
+            <input type="text" id="customSourceFormat" class="custom-source-input custom-source-input-small" placeholder="格式（選填，例如 png）" autocomplete="off">
+            <input type="text" id="customSourceAttribution" class="custom-source-input" placeholder="版權標示（選填）" autocomplete="off">
+            <button type="button" id="customSourceAddBtn" class="custom-source-add-btn">加入</button>
+          </div>
+        </div>
+
+        <div id="customSourceWmtsPanel" style="display:none;">
+          <p class="custom-source-hint">貼上該服務的 WMTS GetCapabilities 網址，讀取後會列出這個服務底下所有圖層，可以一次勾選多張加入。這一步需要該服務開放跨網域讀取（CORS）才能成功；如果讀取失敗，圖磚本身通常還是能顯示，改用「手動貼網址」分頁直接加入即可（如果站台有設定代理伺服器，這裡會自動改用代理再試一次）。只會加入座標系統跟這個地圖相容（EPSG:3857）的圖層。</p>
+          <div class="custom-source-form">
+            <input type="text" id="wmtsCapabilitiesUrl" class="custom-source-input" placeholder="GetCapabilities 網址，例如 https://example.com/wmts?SERVICE=WMTS&REQUEST=GetCapabilities" autocomplete="off">
+            <button type="button" id="wmtsFetchBtn" class="custom-source-add-btn">讀取圖層清單</button>
+          </div>
+          <div id="wmtsImportStatus" class="custom-source-hint"></div>
+          <div class="wmts-layer-list-actions">
+            <button type="button" id="wmtsSelectAllBtn" class="wmts-select-all-btn" style="display:none;">全選／取消全選</button>
+          </div>
+          <div id="wmtsLayerList" class="wmts-layer-list"></div>
+          <button type="button" id="wmtsAddSelectedBtn" class="custom-source-add-btn wmts-add-selected-btn" style="display:none;">加入勾選的圖層</button>
+        </div>
+
+        <div id="customSourceList" class="custom-source-list"></div>
+        <button type="button" id="customSourceClearAllBtn" class="map-timeline-refresh-btn custom-source-clear-all-btn">清除全部自訂圖層</button>
+      </div>
+
+      <div id="multiCategories" class="multi-categories"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/ol@v9.2.4/dist/ol.js"></script>
+<script type="module" src="./src/main.js?v=2"></script>
+</body>
+</html>

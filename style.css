@@ -1,0 +1,765 @@
+  :root{
+    --ink:#17211D;
+    --paper:#EAE3D3;
+    --paper-dim:#DCD3BC;
+    --brass:#A8813C;
+    --brass-dark:#8A6A2E;
+    --rule:#8B7355;
+    --stamp:#A63D2F;
+    --serif:'Spectral', Georgia, serif;
+    --sans:'Public Sans', -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;font-family:var(--sans);background:var(--ink);}
+  #map{position:absolute;inset:0;background:#0e1512;}
+
+  /* ---------- Sidebar ---------- */
+  #sidebar{
+    position:absolute;
+    top:16px; left:16px; bottom:16px;
+    width:340px;
+    background:var(--paper);
+    border:1px solid var(--rule);
+    box-shadow:0 8px 24px rgba(0,0,0,.35);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    z-index:10;
+  }
+  #sidebar.compact-mode{bottom:auto; max-height:70vh;}
+  #sidebar.collapsed{
+    width:36px; height:36px; top:16px; bottom:auto;
+    border-radius:50%; box-shadow:0 4px 10px rgba(0,0,0,.3);
+    overflow:visible;
+  }
+  #sidebar.collapsed .sidebar-body,
+  #sidebar.collapsed .sidebar-header-text{display:none;}
+  #sidebar.collapsed .sidebar-header{
+    padding:0; border-bottom:none; height:100%;
+    align-items:center; justify-content:center;
+  }
+  #sidebar.collapsed #toggleSidebar{
+    width:100%; height:100%; border:none; border-radius:50%; font-size:13px;
+  }
+
+  .sidebar-header{
+    display:flex; align-items:flex-start; justify-content:space-between;
+    padding:18px 18px 14px;
+    border-bottom:1px solid var(--rule);
+    flex-shrink:0;
+  }
+  .sidebar-header-text h1{
+    font-family:var(--serif); font-weight:600; font-size:19px;
+    margin:0 0 3px; color:var(--ink); line-height:1.25;
+  }
+  .sidebar-header-text p{
+    margin:0; font-size:12px; color:var(--rule); letter-spacing:.02em;
+  }
+  #toggleSidebar{
+    background:none; border:1px solid var(--rule); color:var(--ink);
+    width:26px; height:26px; flex-shrink:0; cursor:pointer;
+    font-size:14px; line-height:1; border-radius:2px;
+  }
+  #toggleSidebar:hover{background:var(--paper-dim);}
+
+  /* ---------- 側邊欄捲動吸附：避免圖層清單捲動時，
+     來源／分類標題方塊被吸附區塊「腰斬」成一半、看起來像文字滑過空白處 ---------- */
+  /* ---------- 側邊欄捲動吸附：避免圖層清單捲動時，
+     來源／分類標題方塊被吸附區塊「腰斬」成一半、看起來像文字滑過空白處 ---------- */
+  .sidebar-body{
+    flex:1; overflow-y:auto; padding:14px 18px 18px;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior: contain; /* 避免手機版彈性回彈(rubber-band)時，捲動容器邊界外的內容瞬間外露 */
+  }
+  /* 拿掉 scroll-snap：吸附機制會在使用者手動滑動時持續跟手勢的動量「打架」，
+     造成明顯卡頓／回彈感；展開來源時的自動捲動已改由 JS 的 scrollIntoView 處理，
+     不需要再靠 CSS 層級的 snap 對齊，因此 scroll-margin-top 保留給 scrollIntoView 使用即可。 */
+  .source-head, .category-head{
+    scroll-margin-top: var(--sticky-offset, 96px);
+  }
+
+  /* mode switch (置於最上方，永遠顯示) */
+  .mode-switch{
+    display:flex; border:1px solid var(--ink); border-radius:2px; overflow:hidden;
+    margin-bottom:18px;
+  }
+  .mode-switch button{
+    flex:1; background:var(--paper); border:none; padding:8px 2px;
+    font-family:var(--sans); font-size:11.5px; font-weight:600; color:var(--ink);
+    cursor:pointer; border-right:1px solid var(--ink);
+  }
+  .mode-switch button:last-child{border-right:none;}
+  .mode-switch button.active{background:var(--ink); color:var(--paper);}
+
+  /* compare panel */
+  #comparePanel{display:none;}
+
+  /* multi (複合疊圖) panel — checkbox 圖層樹，樣式沿用 .source-group／
+     .category／.layer-item（見下方「categories / accordion」區塊），
+     這裡只補打勾狀態的視覺提示，跟疊圖模式單選時純粹反白的呈現方式
+     做一點區隔，讓使用者一眼看出這裡是「可以勾很多個」。 */
+  #multiPanel{display:none;}
+  .multi-categories .layer-item{padding-left:30px; position:relative;}
+  .multi-categories .layer-item::before{
+    content:"";
+    position:absolute; left:6px; top:50%; transform:translateY(-50%);
+    width:12px; height:12px; border:1.5px solid var(--rule); border-radius:2px;
+    background:var(--paper);
+  }
+  .multi-categories .layer-item.active::before{
+    background:var(--brass-dark); border-color:var(--brass-dark);
+  }
+  .multi-categories .layer-item.active::after{
+    content:"✓";
+    position:absolute; left:8px; top:50%; transform:translateY(-50%);
+    font-size:10px; color:var(--paper); line-height:1;
+  }
+  .multi-categories .subcategory .layer-item{padding-left:40px;}
+  .multi-categories .subcategory .layer-item::before{left:16px;}
+  .multi-categories .subcategory .layer-item.active::after{left:18px;}
+  .compare-select-block{margin-bottom:16px;}
+  .compare-select-block .field-label{display:flex; align-items:center; gap:6px;}
+  .side-dot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+  .side-dot.a{background:var(--brass-dark);}
+  .side-dot.b{background:var(--stamp);}
+  select.layer-select{
+    width:100%; padding:7px 8px; border:1px solid var(--rule); border-radius:2px;
+    background:var(--paper); color:var(--ink); font-family:var(--sans); font-size:12.5px;
+  }
+  .compare-hint{font-size:11.5px; color:var(--rule); line-height:1.5; margin-top:2px;}
+
+  /* base layer segmented control */
+  .field-label{
+    font-size:11px; color:var(--rule); margin:0 0 6px;
+    font-weight:600; letter-spacing:.03em;
+  }
+  .segmented{
+    display:flex; border:1px solid var(--rule); border-radius:2px; overflow:hidden;
+    margin-bottom:18px;
+  }
+  .segmented button{
+    flex:1; background:var(--paper); border:none; padding:7px 0;
+    font-family:var(--sans); font-size:12.5px; color:var(--ink);
+    cursor:pointer; border-right:1px solid var(--rule);
+  }
+  .segmented button:last-child{border-right:none;}
+  .segmented button.active{background:var(--ink); color:var(--paper);}
+
+  /* categories / accordion */
+  .category{border-top:1px solid var(--rule);}
+  .category:last-child{border-bottom:1px solid var(--rule); margin-bottom:16px;}
+  .category-head{
+    width:100%; text-align:left; background:none; border:none;
+    padding:10px 2px; cursor:pointer;
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:var(--sans); font-weight:600; font-size:13px; color:var(--ink);
+  }
+  .category-head .count{font-weight:400; color:var(--rule); font-size:11.5px;}
+  .category-body{display:none; padding:0 2px 10px;}
+  .category.open .category-body{display:block;}
+  .category.open .chevron{transform:rotate(90deg);}
+  .chevron{display:inline-block; transition:transform .15s ease; margin-right:6px; font-size:10px;}
+
+  .layer-item{
+    display:flex; align-items:baseline; gap:8px;
+    padding:5px 4px 5px 18px; cursor:pointer; border-radius:2px;
+  }
+  .layer-item:hover{background:var(--paper-dim);}
+  .layer-item.active{background:var(--ink);}
+  .layer-item.active .layer-title{color:var(--paper);}
+  .layer-item.active .layer-year{color:var(--brass);}
+  .layer-year{font-family:var(--serif); font-size:12px; color:var(--rule); width:40px; flex-shrink:0;}
+  .layer-title{font-size:12.5px; color:var(--ink); line-height:1.35;}
+
+  /* 次分類（例：廳底下再依「堡」分一層）手風琴，樣式較 .category 淡一階 */
+  .subcategory{border-top:1px dashed var(--rule); margin-left:6px;}
+  .subcategory:first-child{border-top:none;}
+  .subcategory-head{
+    width:100%; text-align:left; background:none; border:none;
+    padding:7px 2px 7px 8px; cursor:pointer;
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:var(--sans); font-weight:600; font-size:12px; color:var(--rule);
+  }
+  .subcategory-head .count{font-weight:400; color:var(--rule); font-size:11px;}
+  .subcategory-body{display:none; padding:0 2px 6px;}
+  .subcategory.open > .subcategory-body{display:block;}
+  .subcategory.open > .subcategory-head .chevron{transform:rotate(90deg);}
+  .subcategory .layer-item{padding-left:28px;}
+
+  /* opacity control：吸附在側邊欄可視範圍最上方，圖層清單再長也不用捲到底 */
+  .opacity-block{
+    position:sticky; top:0; z-index:5;
+    background:var(--paper);
+    border-bottom:1px solid var(--rule); padding-bottom:14px; margin-bottom:6px;
+    box-shadow:0 6px 8px -6px rgba(0,0,0,.18);
+    /* 強制獨立合成層，避免快速捲動／手機彈性回彈時吸附區塊來不及重繪，
+       短暫露出下方被捲上來的圖層清單內容（例如深色的選取中圖層列） */
+    transform:translateZ(0);
+    -webkit-transform:translateZ(0);
+    will-change:transform;
+  }
+  /* 向上延伸與吸附區塊相同底色的遮罩，補滿吸附瞬間／回彈時上方可能露出的空白處 */
+  .opacity-block::before{
+    content:"";
+    position:absolute;
+    left:-1px; right:-1px; top:-32px;
+    height:32px;
+    background:var(--paper);
+    z-index:1;
+  }
+  .opacity-row{display:flex; align-items:center; gap:10px;}
+  .opacity-row input[type=range]{flex:1; accent-color:var(--brass-dark);}
+  .opacity-val{font-family:var(--serif); font-size:13px; color:var(--ink); width:34px; text-align:right;}
+  .clear-btn{
+    margin-top:10px; width:100%; background:none; border:1px solid var(--rule);
+    color:var(--rule); font-size:11.5px; padding:6px 0; cursor:pointer; border-radius:2px;
+  }
+  .clear-btn:hover{border-color:var(--ink); color:var(--ink);}
+
+  /* ---------- 浮動透明度控制：側邊欄收合後（透明疊圖模式）顯示於左下角，
+     讓使用者不必展開整個側邊欄也能調整歷史圖層透明度 ---------- */
+  .floating-opacity{
+    position:absolute; left:16px; bottom:16px; z-index:9;
+    display:none; align-items:center; gap:9px;
+    min-width:190px;
+    background:var(--paper); border:1px solid var(--rule);
+    box-shadow:0 4px 12px rgba(0,0,0,.3);
+    border-radius:3px; padding:9px 12px;
+  }
+  .floating-opacity.show{display:flex;}
+  .floating-opacity .field-label{margin:0; white-space:nowrap; flex-shrink:0;}
+  .floating-opacity input[type=range]{flex:1; accent-color:var(--brass-dark);}
+  .floating-opacity .opacity-val{font-family:var(--serif); font-size:13px; color:var(--ink); width:34px; text-align:right; flex-shrink:0;}
+
+  /* 繪製工具列：垂直放在右側，locate 按鈕跟縮放控制中間的空白區塊 */
+  /* 收合按鈕：跟定位按鈕份量差不多大，不畫圖時不搶戲 */
+  .draw-toggle-btn{
+    position:absolute; top:70px; right:16px; z-index:9;
+    width:40px; height:40px; border-radius:50%;
+    background:var(--ink); color:var(--paper); border:2px solid var(--paper);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; box-shadow:0 3px 10px rgba(0,0,0,.3);
+  }
+  .draw-toggle-btn svg{width:18px; height:18px;}
+  .draw-toggle-btn:hover{background:var(--brass-dark);}
+  .draw-toggle-btn.active{background:var(--stamp); border-color:var(--stamp);}
+
+  /* 展開後的工具列：固定兩排、每排四顆按鈕橫排（選取/點/線/面 一排，
+     刪除/清空/GeoJSON/截圖 一排），寬度固定、不需捲動。
+     寬度以「選取／點／線／面」這排的字寬為準，GeoJSON／截圖字比較長，
+     放不下就用較小字級＋兩行文字塞進同樣大小的格子，而不是把格子撐大 */
+  .draw-toolbar{
+    position:absolute; top:118px; right:16px; z-index:8;
+    display:none; flex-direction:column; align-items:stretch; gap:6px;
+    background:var(--paper); border:1px solid var(--rule); border-radius:14px;
+    padding:8px; box-shadow:0 3px 10px rgba(0,0,0,.3);
+    width:208px;
+  }
+  .draw-toolbar.show{display:flex;}
+  .draw-toolbar-row{display:flex; flex-direction:row; gap:5px;}
+  .draw-tool-btn{
+    font-size:11.5px; padding:6px 4px;
+    background:var(--paper); color:var(--ink); border:1px solid var(--rule);
+    border-radius:12px; cursor:pointer; white-space:nowrap;
+    flex:1 1 0; min-width:0; text-align:center;
+  }
+  .draw-tool-btn:hover{background:var(--paper-dim);}
+  .draw-tool-btn.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+
+  /* 清空＝破壞性操作（一鍵清除全部繪製內容），用紅色提示使用者留意 */
+  .draw-tool-btn-danger{
+    color:#b3261e; border-color:#e2a29c;
+  }
+  .draw-tool-btn-danger:hover{background:#fbe9e7; border-color:#b3261e;}
+
+  /* 「匯出 GeoJSON」「地圖截圖」字比其他按鈕長，格子大小仍跟同排其他
+     按鈕一樣（flex:1 1 0 平分寬度），放不下就縮小字級＋兩行顯示 */
+  .draw-tool-btn-wrap{
+    white-space:normal; line-height:1.15; font-size:9.5px; padding:5px 2px;
+
+  }
+
+  /* ---------- Date stamp (signature element) ---------- */
+  #stamp{
+    position:absolute; right:22px; bottom:22px; z-index:10;
+    width:108px; height:108px;
+    border:2px solid var(--stamp);
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    color:var(--stamp); font-family:var(--serif);
+    transform:rotate(-8deg);
+    background:rgba(234,227,211,.88);
+    opacity:0; transition:opacity .25s ease, transform .25s ease;
+    pointer-events:none;
+    text-align:center;
+  }
+  #stamp.show{opacity:1;}
+  #stamp .stamp-year{font-size:26px; font-weight:700; line-height:1;}
+  #stamp .stamp-label{font-size:9px; letter-spacing:.08em; margin-top:4px; max-width:82px; line-height:1.2;}
+  #stamp::before{
+    content:""; position:absolute; inset:6px; border:1px solid var(--stamp); border-radius:50%;
+  }
+
+  /* attribution tweak */
+  .ol-attribution{background:rgba(234,227,211,.85) !important; font-family:var(--sans); font-size:10.5px;}
+
+  /* ---------- 地圖縮放按鈕：不論疊圖或比對模式、側邊欄展開或收合，
+     左側整條都可能被側邊欄佔住，故把 OpenLayers 內建的 +/- 縮放
+     控制項改放到右下角空白處。右下角同時有日期印章（#stamp，
+     bottom:22px、高 108px，最高會佔到約 bottom:130px），縮放按鈕
+     必須整個放在印章上方、留出安全間距，避免兩者互相遮擋 ---------- */
+  .ol-zoom{
+    top:auto; left:auto; right:16px; bottom:150px;
+  }
+  .ol-zoom button{
+    background-color:rgba(23,33,29,.88) !important;
+  }
+  .ol-zoom button:hover,
+  .ol-zoom button:focus{
+    background-color:rgba(23,33,29,1) !important;
+  }
+
+  /* ---------- 定位功能 ---------- */
+  .locate-btn{
+    position:absolute; top:16px; right:16px; z-index:9;
+    width:38px; height:38px; border-radius:50%;
+    background:rgba(23,33,29,.88); border:1px solid var(--brass); color:var(--paper);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    box-shadow:0 4px 10px rgba(0,0,0,.3);
+  }
+  .locate-btn:hover{background:rgba(23,33,29,1); border-color:var(--stamp);}
+  .locate-btn svg{width:18px; height:18px;}
+  .locate-btn.loading svg{animation:locate-spin 1s linear infinite;}
+  @keyframes locate-spin{ to{ transform:rotate(360deg); } }
+
+  .locate-toast{
+    position:absolute; top:64px; right:16px; z-index:9;
+    max-width:260px; background:rgba(23,33,29,.92); color:var(--paper);
+    font-family:var(--sans); font-size:12px; line-height:1.5; padding:9px 12px; border-radius:3px;
+    box-shadow:0 4px 12px rgba(0,0,0,.3);
+    display:none;
+  }
+  .locate-toast.show{display:block;}
+
+  .locate-marker{
+    position:absolute; z-index:8; width:0; height:0; display:none; pointer-events:none;
+  }
+  .locate-marker.show{display:block;}
+  .locate-marker-dot{
+    position:absolute; left:-8px; top:-8px; width:16px; height:16px; border-radius:50%;
+    background:#2f6fed; border:2px solid #fff; box-shadow:0 0 0 4px rgba(47,111,237,.35);
+  }
+
+  @media (max-width:640px){
+    .locate-toast{right:10px; max-width:70vw;}
+  }
+
+  /* ---------- 地址搜尋 ---------- */
+  .search-block{margin-bottom:18px; position:relative;}
+  .search-row{display:flex; gap:6px;}
+  .address-input{
+    flex:1; min-width:0; padding:7px 9px; border:1px solid var(--rule); border-radius:2px;
+    background:var(--paper); color:var(--ink); font-family:var(--sans); font-size:12.5px;
+  }
+  .address-input:focus{outline:none; border-color:var(--brass-dark);}
+  .address-search-btn{
+    flex-shrink:0; width:32px; height:32px; border:1px solid var(--ink); border-radius:2px;
+    background:var(--ink); color:var(--paper); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .address-search-btn:hover{background:var(--brass-dark); border-color:var(--brass-dark);}
+  .address-search-btn svg{width:15px; height:15px;}
+  .address-search-btn.loading svg{animation:locate-spin 1s linear infinite;}
+
+  /* 用目前位置搜尋圖層：外觀比照地址搜尋按鈕，改用琥珀色以區隔「用定位」與「用文字」兩種搜尋入口 */
+  .locate-search-btn{background:var(--brass-dark); border-color:var(--brass-dark);}
+  .locate-search-btn:hover{background:var(--stamp); border-color:var(--stamp);}
+
+  .address-suggest{
+    position:absolute; left:0; right:0; top:calc(100% + 2px); z-index:15;
+    background:var(--paper); border:1px solid var(--rule); border-radius:2px;
+    box-shadow:0 8px 20px rgba(0,0,0,.3);
+    display:none; max-height:220px; overflow-y:auto;
+  }
+  .address-suggest.show{display:block;}
+  .address-suggest-item{
+    padding:8px 10px; font-size:12px; color:var(--ink); line-height:1.4; cursor:pointer;
+    border-bottom:1px dashed var(--rule);
+  }
+  .address-suggest-item:last-child{border-bottom:none;}
+  .address-suggest-item:hover{background:var(--paper-dim);}
+  .address-suggest-empty{padding:8px 10px; font-size:12px; color:var(--rule);}
+
+  .location-result{
+    margin-top:10px; padding-top:10px; border-top:1px solid var(--rule);
+  }
+  .location-result-head{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:8px;
+  }
+  .location-name{font-family:var(--serif); font-size:12.5px; color:var(--ink); line-height:1.4;}
+  .location-clear-btn{
+    flex-shrink:0; background:none; border:1px solid var(--rule); color:var(--rule);
+    width:20px; height:20px; border-radius:50%; cursor:pointer; font-size:11px; line-height:1;
+  }
+  .location-clear-btn:hover{border-color:var(--stamp); color:var(--stamp);}
+
+  .avail-progress{font-size:11.5px; color:var(--rule); padding:4px 2px;}
+  .avail-empty{font-size:12px; color:var(--rule); line-height:1.6; padding:4px 2px; margin:0 0 4px;}
+
+  /* 搜尋結果面板頂端的「類型篩選／年代排序」工具列，純前端在已取得的
+     available 陣列上過濾／重排，視覺上沿用 .segmented／.source-head 那套
+     淡雅、方形邊框的語彙，維持跟結果清單協調。 */
+  .avail-filter-toolbar{
+    display:flex; flex-direction:column; gap:6px;
+    margin:0 0 10px; padding:6px 4px; border:1px solid var(--paper-dim); border-radius:2px;
+    background:var(--paper-dim);
+  }
+  .avail-filter-row{display:flex; flex-wrap:wrap; align-items:center; gap:6px;}
+  .avail-filter-label{
+    font-size:11px; color:var(--rule); flex-shrink:0; width:32px;
+  }
+  .avail-filter-btn{
+    background:var(--paper); border:1px solid var(--rule); border-radius:2px;
+    padding:4px 9px; font-family:var(--sans); font-size:11.5px; color:var(--ink);
+    cursor:pointer; white-space:nowrap;
+    transition:background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .avail-filter-btn:hover{border-color:var(--brass-dark); color:var(--brass-dark);}
+  .avail-filter-btn.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+
+  /* 時間軸模式（timelineMode.js）專用樣式，搜尋結果面板已不再使用時間軸檢視 */
+  .timeline-scroll{overflow-x:auto; padding:4px 2px 8px; -webkit-overflow-scrolling:touch;}
+  .timeline-svg{display:block;}
+  .timeline-tick-label{font-size:10px; fill:var(--rule); font-family:var(--sans);}
+
+  /* 時間軸：箭頭形狀，顏色代表播放進度 */
+  .timeline-arrow{
+    fill:var(--paper); stroke:var(--rule); stroke-width:1.2; cursor:pointer;
+    transition:fill .15s ease, stroke .15s ease;
+  }
+  .timeline-arrow:hover{stroke:var(--brass-dark);}
+  .timeline-arrow.passed{fill:var(--brass); stroke:var(--brass-dark);}
+  .timeline-arrow.active{fill:var(--stamp); stroke:var(--stamp);}
+  .timeline-svg.dragging .timeline-arrow{cursor:grabbing;}
+
+  .timeline-undated{margin-top:10px; padding-top:8px; border-top:1px dashed var(--rule);}
+  .timeline-undated-label{font-size:11px; color:var(--rule); margin-bottom:6px;}
+  .timeline-undated-list{display:flex; flex-wrap:wrap; gap:6px;}
+  .timeline-undated-chip{
+    font-size:11.5px; padding:5px 10px; background:var(--paper); border:1px solid var(--rule);
+    border-radius:14px; cursor:pointer; white-space:nowrap;
+  }
+  .timeline-undated-chip:hover{background:var(--paper-dim);}
+  .timeline-undated-chip.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+
+  /* 時間軸：自動播放 */
+  .timeline-controls{margin:1px 2px 3px;}
+  .timeline-play-btn{
+    font-size:11px; padding:3px 10px; background:var(--paper); color:var(--ink);
+    border:1px solid var(--rule); border-radius:12px; cursor:pointer;
+  }
+  .timeline-play-btn:hover{background:var(--paper-dim);}
+  .timeline-play-btn.playing{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .avail-source-label{
+    font-size:11px; font-weight:600; color:var(--brass-dark); letter-spacing:.02em;
+    padding:8px 2px 3px; border-top:1px dashed var(--rule); margin-top:4px;
+  }
+  .avail-source-label:first-child{border-top:none; margin-top:0;}
+  .avail-layer-list .layer-item{padding-left:4px;}
+
+  /* 地址搜尋定位圖釘（區別於藍色定位圓點） */
+  .address-marker{position:absolute; z-index:8; width:22px; height:28px; display:none; pointer-events:none;}
+  .address-marker.show{display:block;}
+  .address-marker-pin{position:relative; width:20px; height:26px;}
+  .address-marker-pin::before{
+    content:""; position:absolute; left:0; top:0; width:20px; height:20px; border-radius:50% 50% 50% 0;
+    background:var(--stamp); transform:rotate(-45deg); box-shadow:0 2px 6px rgba(0,0,0,.4);
+  }
+  .address-marker-pin::after{
+    content:""; position:absolute; left:7px; top:6px; width:6px; height:6px; border-radius:50%; background:var(--paper);
+  }
+
+  /* ---------- Swipe compare divider ---------- */
+  #swipeDivider{
+    position:absolute; top:0; bottom:0; width:0; z-index:9;
+    display:none; pointer-events:none;
+  }
+  #swipeDivider.show{display:block;}
+  #swipeLine{
+    position:absolute; top:0; bottom:0; left:0; width:2px; background:var(--paper);
+    box-shadow:0 0 0 1px rgba(0,0,0,.35);
+  }
+  #swipeHandle{
+    position:absolute; top:50%; left:0; transform:translate(-50%,-50%);
+    width:34px; height:34px; border-radius:50%; background:var(--paper);
+    border:2px solid var(--ink); cursor:ew-resize; pointer-events:auto;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; color:var(--ink); box-shadow:0 2px 6px rgba(0,0,0,.3);
+    touch-action:none;
+  }
+  /* ---------- 左右比對：浮動於地圖左下／右下的圖層選單 ---------- */
+  /* z-index 特別設成 11（比 #swipeDivider 的 9 高一階）：這個容器內部
+     的 .layer-picker-panel 雖然自己設了 z-index:20，但那只在
+     .compare-float-item 自己的疊層範圍內有效，出了這層就不算數。
+     #swipeDivider 在 HTML 裡排在 .compare-float-item 後面，兩者原本
+     同樣是 z-index:9，同分時後面的元素蓋前面的，導致展開圖層選單時
+     滑桿分隔線／把手會蓋在選單面板上面。直接把整個容器墊高，
+     面板展開時才能確實蓋過滑桿。 */
+  .compare-float-item{
+    position:absolute; bottom:16px; z-index:11; display:none;
+    align-items:center; gap:6px;
+    background:rgba(23,33,29,.82); padding:5px 8px; border-radius:3px;
+    box-shadow:0 3px 10px rgba(0,0,0,.3);
+    max-width:44vw;
+  }
+  .compare-float-item.show{display:flex;}
+  #compareWrapA{left:16px;}
+  #compareWrapB{right:16px;}
+  select.compare-select-floating{
+    background:var(--paper); color:var(--ink); font-family:var(--sans);
+    font-size:11.5px; font-weight:600; padding:4px 6px; border-radius:2px;
+    border:1px solid var(--brass); max-width:34vw; min-width:110px; cursor:pointer;
+  }
+  select.compare-select-floating:hover,
+  select.compare-select-floating:focus{border-color:var(--stamp); outline:none;}
+
+  /* ---------- 時間軸模式：地圖下方浮動列 ---------- */
+  #mapTimelineBar{
+    position:absolute; left:50%; bottom:16px; z-index:9;
+    transform:translateX(-50%);
+    width:min(560px, calc(100% - 32px)); /* 固定寬度、置中，兩側留出地圖可視空間；小螢幕才會頂到邊界 */
+    display:none;
+    background:var(--paper); border:1px solid var(--rule); border-radius:6px;
+    box-shadow:0 4px 14px rgba(0,0,0,.35);
+    padding:6px 14px 3px;
+    max-height:130px; overflow-y:auto; overflow-x:hidden;
+  }
+  #mapTimelineBar.show{display:block;}
+  .map-timeline-bar-inner .avail-empty{margin:4px 2px;}
+  .map-timeline-bar-head{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding-bottom:4px; margin-bottom:1px; border-bottom:1px solid var(--paper-dim);
+  }
+  .map-timeline-hint{font-size:11px; color:var(--rule); font-weight:600; letter-spacing:.02em;}
+  .map-timeline-scale-switch{display:flex; gap:4px;}
+  .map-timeline-scale-switch button{
+    font-size:10.5px; padding:3px 8px; background:var(--paper); color:var(--rule);
+    border:1px solid var(--rule); border-radius:10px; cursor:pointer; white-space:nowrap;
+  }
+  .map-timeline-scale-switch button:hover{background:var(--paper-dim);}
+  .map-timeline-scale-switch button.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .map-timeline-refresh-btn{
+    font-size:11px; padding:3px 9px; background:var(--paper); color:var(--ink);
+    border:1px solid var(--rule); border-radius:12px; cursor:pointer; white-space:nowrap;
+    flex-shrink:0;
+  }
+  .map-timeline-refresh-btn:hover{background:var(--paper-dim);}
+  /* 地圖已經移動、但使用者還沒按重新整理：按鈕改用醒目色提示 */
+  .map-timeline-refresh-btn.stale{
+    background:var(--stamp); color:var(--paper); border-color:var(--stamp);
+    animation:timeline-stale-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes timeline-stale-pulse{
+    0%, 100%{opacity:1;} 50%{opacity:.72;}
+  }
+
+  /* ---------- 複合疊圖模式：地圖下方浮動的「已選圖層」清單面板 ----------
+     跟 #mapTimelineBar 走同一套「模式專屬控制放在地圖上的浮動元件」
+     版位慣例（位置、寬度、樣式都直接沿用），差別只在內容是可捲動的
+     圖層清單，不是時間軸箭頭。 */
+  #multiOverlayBar{
+    position:absolute; left:50%; bottom:16px; z-index:9;
+    transform:translateX(-50%);
+    width:min(420px, calc(100% - 32px));
+    display:none;
+    background:var(--paper); border:1px solid var(--rule); border-radius:6px;
+    box-shadow:0 4px 14px rgba(0,0,0,.35);
+    padding:6px 12px 8px;
+    max-height:220px; overflow-y:auto; overflow-x:hidden;
+  }
+  #multiOverlayBar.show{display:block;}
+  .multi-overlay-bar-head{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding-bottom:4px; margin-bottom:4px; border-bottom:1px solid var(--paper-dim);
+  }
+  .multi-layer-empty{font-size:11.5px; color:var(--rule); padding:6px 2px; line-height:1.5;}
+  .multi-layer-row{
+    display:flex; flex-direction:column; gap:4px;
+    padding:6px 2px; border-bottom:1px dashed var(--paper-dim);
+  }
+  .multi-layer-row:last-child{border-bottom:none;}
+  .multi-layer-title{
+    font-size:12px; color:var(--ink); font-weight:600; line-height:1.3;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .multi-layer-controls{display:flex; align-items:center; gap:6px;}
+  .multi-layer-opacity{flex:1; min-width:0; accent-color:var(--brass-dark);}
+  .multi-layer-opacity-val{
+    font-family:var(--serif); font-size:11.5px; color:var(--ink);
+    width:32px; text-align:right; flex-shrink:0;
+  }
+  .multi-layer-move, .multi-layer-remove{
+    flex-shrink:0; width:22px; height:22px; padding:0;
+    background:var(--paper); border:1px solid var(--rule); border-radius:2px;
+    font-size:10px; color:var(--ink); cursor:pointer; line-height:1;
+  }
+  .multi-layer-move:hover, .multi-layer-remove:hover{background:var(--paper-dim);}
+  .multi-layer-move:disabled{opacity:.35; cursor:default;}
+  .multi-layer-move:disabled:hover{background:var(--paper);}
+  .multi-layer-remove{color:var(--stamp); border-color:var(--stamp);}
+  .multi-layer-remove:hover{background:rgba(166,61,47,.1);}
+
+  /* 圖層選擇器：按鈕 + 手風琴浮動面板 */
+  .layer-picker{position:relative;}
+  .layer-picker-btn{
+    display:flex; align-items:center; gap:6px;
+    background:var(--paper); color:var(--ink); font-family:var(--sans);
+    font-size:11.5px; font-weight:600; padding:5px 8px; border-radius:2px;
+    border:1px solid var(--brass); cursor:pointer; max-width:38vw; min-width:120px;
+  }
+  .layer-picker-btn:hover{border-color:var(--stamp);}
+  .picker-btn-label{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; text-align:left;}
+  .picker-btn-arrow{font-size:9px; flex-shrink:0; color:var(--rule);}
+
+  .layer-picker-panel{
+    position:absolute; bottom:calc(100% + 8px); left:0;
+    width:300px; max-width:80vw; max-height:56vh; overflow-y:auto;
+    background:var(--paper); border:1px solid var(--rule); border-radius:3px;
+    box-shadow:0 10px 28px rgba(0,0,0,.4);
+    display:none; z-index:20; padding:6px;
+  }
+  .layer-picker-panel.open{display:block;}
+  #compareWrapB .layer-picker-panel{left:auto; right:0;}
+  /* 這個彈出面板自己就是獨立捲動容器，前面沒有側邊欄的透明度區塊，
+     篩選列直接吸附在面板最上方即可，不套用側邊欄用的 --sticky-offset。 */
+  .layer-picker-panel .country-filter{top:0; margin:-6px -6px 10px; padding:6px;}
+  .layer-picker-panel::-webkit-scrollbar{width:8px;}
+  .layer-picker-panel::-webkit-scrollbar-thumb{background:var(--rule); border-radius:4px;}
+
+  /* WMTS 圖資來源（最上層分組，內含分類 → 圖層） */
+  /* 國家篩選列（台灣／中國／其他）：吸附在透明度區塊下方，
+     一起貼齊側邊欄可視範圍最上方，收合掉不想看的來源後，
+     不用捲很長就能找到剩下的來源。 */
+  .country-filter{
+    position:sticky; top:var(--sticky-offset, 0px); z-index:4;
+    background:var(--paper); margin:0 0 10px; box-shadow:0 4px 6px -6px rgba(0,0,0,.18);
+    /* 跟 .opacity-block 同樣強制獨立合成層，避免快速捲動／手機彈性回彈時
+       這條吸附列來不及跟上捲動位移，短暫露出下方被捲上來的來源清單內容。 */
+    transform:translateZ(0);
+    -webkit-transform:translateZ(0);
+    will-change:transform;
+  }
+  /* 向上延伸與吸附列相同底色的遮罩，補滿吸附瞬間／回彈時上方（跟前一個
+     吸附區塊接縫處）可能露出的空白，避免清單內容從縫隙「穿過」吸附列。 */
+  .country-filter::before{
+    content:"";
+    position:absolute;
+    left:-1px; right:-1px; top:-10px;
+    height:10px;
+    background:var(--paper);
+    z-index:1;
+  }
+  .country-filter button{padding:6px 2px; font-size:11px;}
+  .source-group.country-hidden{display:none;}
+
+  .source-group{margin-bottom:4px;}
+  .source-head{
+    width:100%; text-align:left; background:var(--paper-dim); border:1px solid var(--rule);
+    padding:9px 10px; cursor:pointer; border-radius:2px; margin-bottom:2px;
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:var(--sans); font-weight:700; font-size:12.5px; color:var(--ink);
+  }
+  .source-head:hover{background:var(--paper);}
+  .source-head .count{font-weight:400; color:var(--rule); font-size:11px;}
+  .source-body{display:none; padding-left:6px;}
+  .source-group.open > .source-body{display:block;}
+  .source-group.open > .source-head .chevron{transform:rotate(90deg);}
+
+  @media (max-width:640px){
+    .compare-float-item{max-width:60vw; padding:4px 6px;}
+    select.compare-select-floating{max-width:52vw; min-width:0; font-size:11px;}
+    .layer-picker-btn{max-width:48vw; min-width:0;}
+    .layer-picker-panel{width:82vw;}
+  }
+
+
+  /* scrollbar (paper theme) */
+  .sidebar-body::-webkit-scrollbar{width:8px;}
+  .sidebar-body::-webkit-scrollbar-thumb{background:var(--rule); border-radius:4px;}
+  .sidebar-body::-webkit-scrollbar-track{background:var(--paper-dim);}
+
+  @media (max-width:640px){
+    #sidebar{width:78vw; top:10px; left:10px; bottom:10px;}
+    #stamp{width:84px; height:84px; right:12px; bottom:12px;}
+    #stamp .stamp-year{font-size:20px;}
+    .floating-opacity{left:10px; bottom:10px; min-width:0; width:56vw; padding:8px 10px;}
+    #multiOverlayBar{width:calc(100% - 20px); max-height:40vh;}
+  }
+
+  /* ---------- 使用者自訂 WMTS／XYZ 圖層（複合疊圖面板內） ---------- */
+  .custom-source-block{
+    margin-bottom:16px; padding:10px 10px 12px; border:1px solid var(--rule); border-radius:3px;
+    background:var(--paper-dim);
+  }
+  .custom-source-hint{font-size:11px; color:var(--rule); line-height:1.5; margin:2px 0 8px;}
+  .custom-source-form{display:flex; flex-direction:column; gap:6px;}
+  .custom-source-input{
+    width:100%; box-sizing:border-box; padding:6px 8px; border:1px solid var(--rule); border-radius:2px;
+    background:var(--paper); color:var(--ink); font-family:var(--sans); font-size:12px;
+  }
+  .custom-source-input:focus{outline:none; border-color:var(--brass-dark);}
+  .custom-source-input-small{width:100%;}
+  .custom-source-add-btn{
+    align-self:flex-end; padding:6px 14px; border:1px solid var(--ink); border-radius:2px;
+    background:var(--ink); color:var(--paper); font-size:12px; font-weight:600; cursor:pointer;
+  }
+  .custom-source-add-btn:hover{background:var(--brass-dark); border-color:var(--brass-dark);}
+  .custom-source-list{margin-top:8px; max-height:160px; overflow-y:auto;}
+  .custom-source-empty{font-size:11.5px; color:var(--rule); padding:4px 2px; line-height:1.5;}
+  .custom-source-row{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:5px 2px; border-bottom:1px dashed var(--rule);
+  }
+  .custom-source-row:last-child{border-bottom:none;}
+  .custom-source-label{display:flex; align-items:center; gap:8px; min-width:0; cursor:pointer;}
+  .custom-source-label input[type=checkbox]{flex-shrink:0; accent-color:var(--brass-dark);}
+  .custom-source-name{
+    font-size:12.5px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .custom-source-remove{
+    flex-shrink:0; width:22px; height:22px; padding:0;
+    background:var(--paper); border:1px solid var(--stamp); border-radius:2px;
+    font-size:10px; color:var(--stamp); cursor:pointer; line-height:1;
+  }
+  .custom-source-remove:hover{background:rgba(166,61,47,.1);}
+  .custom-source-clear-all-btn{margin-top:8px; width:100%;}
+
+  .custom-source-tabs{display:flex; gap:6px; margin-bottom:8px;}
+  .custom-source-tabs button{
+    flex:1; padding:6px 4px; border:1px solid var(--rule); border-radius:2px;
+    background:var(--paper); color:var(--rule); font-size:11.5px; font-weight:600; cursor:pointer;
+  }
+  .custom-source-tabs button.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+
+  .custom-source-badge{
+    display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:.03em;
+    padding:1px 5px; border-radius:2px; background:var(--brass-dark); color:var(--paper);
+    vertical-align:middle;
+  }
+  .custom-source-error{color:var(--stamp) !important;}
+
+  .wmts-layer-list-actions{display:flex; justify-content:flex-end; margin:2px 0 4px;}
+  .wmts-select-all-btn{
+    padding:4px 10px; border:1px solid var(--rule); border-radius:2px;
+    background:var(--paper); color:var(--rule); font-size:11px; cursor:pointer;
+  }
+  .wmts-select-all-btn:hover{border-color:var(--ink); color:var(--ink);}
+  .wmts-layer-list{max-height:180px; overflow-y:auto; border:1px solid var(--rule); border-radius:2px; background:var(--paper);}
+  .wmts-layer-row{
+    display:flex; align-items:center; gap:8px; padding:5px 8px; cursor:pointer;
+    border-bottom:1px dashed var(--paper-dim); font-size:12px; color:var(--ink);
+  }
+  .wmts-layer-row:last-child{border-bottom:none;}
+  .wmts-layer-row:hover{background:var(--paper-dim);}
+  .wmts-layer-row input[type=checkbox]{accent-color:var(--brass-dark); flex-shrink:0;}
+  .wmts-layer-title{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .wmts-add-selected-btn{margin-top:8px; width:100%;}
