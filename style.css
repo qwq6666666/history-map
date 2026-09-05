@@ -366,6 +366,9 @@
     position:absolute; left:-8px; top:-8px; width:16px; height:16px; border-radius:50%;
     background:#2f6fed; border:2px solid #fff; box-shadow:0 0 0 4px rgba(47,111,237,.35);
   }
+  /* .locate-marker 為 0 寬容器且 pointer-events:none（避免藍點擋住地圖拖曳），
+     彈窗本身需能點擊（關閉鈕／複製按鈕），故補回 pointer-events:auto。 */
+  .locate-popup{pointer-events:auto;}
 
   @media (max-width:640px){
     .locate-toast{right:10px; max-width:70vw;}

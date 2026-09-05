@@ -43,7 +43,16 @@
   </svg>
 </button>
 <div id="locateToast" class="locate-toast"></div>
-<div id="locateMarker" class="locate-marker"><div class="locate-marker-dot"></div></div>
+<div id="locateMarker" class="locate-marker">
+  <div class="locate-marker-dot"></div>
+  <div id="locatePopup" class="identify-popup locate-popup" hidden>
+    <div class="identify-popup-header">
+      <span class="identify-popup-title">📍 目前位置</span>
+      <button type="button" id="locatePopupClose" class="identify-popup-close" aria-label="關閉">×</button>
+    </div>
+    <div id="locatePopupBody" class="identify-popup-body"></div>
+  </div>
+</div>
 <div id="addressMarker" class="address-marker"><div class="address-marker-pin"></div></div>
 
 <div id="identifyPin" class="identify-pin">
