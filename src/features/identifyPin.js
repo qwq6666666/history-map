@@ -22,7 +22,7 @@
    一律直接略過，不觸發落點，避免搶走那些模式原本的點擊行為。
 --------------------------------------------------------- */
 import { map } from '../core/map.js';
-import { state as store } from '../store.js';
+import { state as store, subscribe } from '../store.js';
 import { runtime } from '../runtime.js';
 import { isDrawToolActive } from '../drawTool.js';
 import { buildCoordInfoElement } from './search.js';
@@ -57,6 +57,17 @@ function clearPin(){
   closePopup();
 }
 
+// Nominatim display_name 是逗點分隔、由小到大（"7號, 忠孝東路四段, 大安區, 台北市, 106, 臺灣"），
+// 轉成台灣慣用的由大到小閱讀順序（"台北市大安區忠孝東路四段7號"）。
+function formatTaiwanAddress(displayName){
+  if(!displayName) return displayName;
+  const parts = displayName.split(',')
+    .map(s => s.trim())
+    .filter(s => s && !/^\d+$/.test(s) && s !== '臺灣' && s !== '台灣');
+  const formatted = parts.reverse().join('');
+  return formatted || displayName;
+}
+
 function renderAddress(el, lon, lat, { forceFetch }){
   currentAddressEl = el;
 
@@ -78,8 +89,8 @@ function renderAddress(el, lon, lat, { forceFetch }){
   reverseGeocode(lon, lat)
     .then(data => {
       if(id !== addressRequestId) return; // 已過期（清除或重新釘點了）
-      const text = (data && data.display_name) ? data.display_name : '查無地址資訊';
-      addressState = { status: 'ok', text };
+      const text = (data && data.display_name) ? formatTaiwanAddress(data.display_name) : '查無地址資訊';
+      addressState = { status: 'ok', text, addr: (data && data.address) || null };
       if(currentAddressEl){ currentAddressEl.textContent = text; currentAddressEl.classList.remove('loading'); }
     })
     .catch(() => {
@@ -96,18 +107,6 @@ function buildAddressBlock(lon, lat, forceFetch){
   return p;
 }
 
-function buildClearButton(){
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'identify-clear-btn';
-  btn.textContent = '🗑️ 清除標記';
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    clearPin();
-  });
-  return btn;
-}
-
 function buildSearchButton(lon, lat, addressEl, onSearchLayers){
   if(!onSearchLayers) return null;
   const btn = document.createElement('button');
@@ -115,11 +114,11 @@ function buildSearchButton(lon, lat, addressEl, onSearchLayers){
   btn.className = 'identify-search-btn';
   btn.textContent = '搜尋涵蓋此點之歷史圖層';
   btn.addEventListener('click', () => {
-    const addr = addressEl ? addressEl.textContent : '';
-    const label = addr && addr !== '查詢地址中…' && addr !== '查無地址資訊' && addr !== '地址查詢失敗'
-      ? addr
+    const addrText = addressEl ? addressEl.textContent : '';
+    const label = addrText && addrText !== '查詢地址中…' && addrText !== '查無地址資訊' && addrText !== '地址查詢失敗'
+      ? addrText
       : `經緯度 ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-    onSearchLayers(lon, lat, label, addr);
+    onSearchLayers(lon, lat, label, addressState.addr || {});
   });
   return btn;
 }
@@ -139,8 +138,6 @@ function renderPopupContent({ forceFetch }){
 
   const searchBtn = buildSearchButton(lon, lat, addressEl, onSearchLayersCb);
   if(searchBtn) identifyPopupBody.appendChild(searchBtn);
-
-  identifyPopupBody.appendChild(buildClearButton());
 }
 
 function createPinAt(coordinate){
@@ -164,9 +161,12 @@ function reopenPopup(){
 }
 
 /** main.js 啟動流程呼叫一次即可。
- * @param {{ onSearchLayers?: (lon:number, lat:number, label:string, addr:string) => void }} opts
+ * @param {{ onSearchLayers?: (lon:number, lat:number, label:string, addr:object) => void }} opts
  *   onSearchLayers：點擊「搜尋涵蓋此點之歷史圖層」按鈕時呼叫，實際的搜尋渲染
  *   邏輯屬於 ui 層，由 main.js 組裝時注入，這裡不 import 任何 src/ui/*。
+ *   addr 務必傳 Nominatim addressdetails=1 回傳的結構化地址元件物件
+ *   （例如 {county, city, town, village, ...}），不能傳格式化過的顯示字串，
+ *   否則 matchSourceIdsForAddress／extractPlaceKeywords 的文字比對會全部失效。
  */
 export function initIdentifyPin({ onSearchLayers } = {}){
   identifyPinEl = document.getElementById('identifyPin');
@@ -180,7 +180,7 @@ export function initIdentifyPin({ onSearchLayers } = {}){
 
   identifyOverlay = new ol.Overlay({
     element: identifyPinEl,
-    positioning: 'bottom-center',
+    positioning: 'center-center',
     stopEvent: true
   });
   map.addOverlay(identifyOverlay);
@@ -188,9 +188,40 @@ export function initIdentifyPin({ onSearchLayers } = {}){
   if(identifyPopupCloseBtn){
     identifyPopupCloseBtn.addEventListener('click', closePopup);
   }
+  const identifyPopupClearBtn = document.getElementById('identifyPopupClear');
+  if(identifyPopupClearBtn){
+    identifyPopupClearBtn.addEventListener('click', clearPin);
+  }
   if(identifyPinMarkerBtn){
     identifyPinMarkerBtn.addEventListener('click', reopenPopup);
   }
+
+  // 地圖右鍵點擊：判斷依據改為「Pin 點資訊欄位（Popup）目前是否開啟」，
+  // 而非側邊欄收合狀態。規則：Popup 開啟時右鍵只關閉 Popup（跟左鍵點擊
+  // 地圖空白處關閉 Popup 的行為一致）；只有在 Popup 已關閉的情況下再次
+  // 右鍵，才真的清除 Pin（跟「清除標記」按鈕共用同一個 clearPin，避免
+  // 重寫一份清除邏輯）。沒有 Pin 時右鍵不做任何事。OL Map 本身不會轉發
+  // contextmenu 事件，需直接對 viewport 掛原生事件監聽。
+  map.getViewport().addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if(!pinCoordinate) return;
+    if(identifyPopupEl && !identifyPopupEl.hidden){
+      closePopup();
+    } else {
+      clearPin();
+    }
+  });
+
+  // 離開一般瀏覽模式（切到比對／時間軸／複合疊圖模式）時，Pin／彈窗
+  // 這個 ol.Overlay 完全獨立於 store.mode，不會因為切模式而自動收起——
+  // 這裡訂閱 store 補上這段清理，避免落點探針的彈窗浮貼在其他模式
+  // 自己的浮動面板（比對模式分隔線、複合疊圖清單等）上面，維持檔頭
+  // 說明的「這個功能限定一般瀏覽模式」設計。
+  subscribe((state, prevState, changedKeys) => {
+    if(changedKeys.includes('mode') && state.mode !== 'overlay' && pinCoordinate){
+      clearPin();
+    }
+  });
 
   map.on('singleclick', (e) => {
     // 模式互斥避讓：非一般瀏覽模式／繪圖工具啟用中／比對模式分隔線拖曳中
