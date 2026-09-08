@@ -72,7 +72,7 @@ export function flyToSourceExtent(srcId){
 export function flyToCategoryExtent(cat){
   if(!cat) return;
   const layers = cat.groups ? cat.groups.flatMap(g => g.layers) : cat.layers;
-  const bboxes = (layers || []).map(l => l.region && l.region.bbox).filter(Boolean);
+  const bboxes = (layers || []).map(l => l.region?.bbox).filter(Boolean);
   if(bboxes.length === 0) return;
   const ext = bboxes.reduce((acc, b) => [
     Math.min(acc[0], b[0]), Math.min(acc[1], b[1]),

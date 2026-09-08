@@ -58,7 +58,7 @@ function matchRank(entry, query){
 
   const yearNumStr = entry.layer.yearNum != null ? String(entry.layer.yearNum) : '';
   const yearLabel = (entry.layer.year || '').toLowerCase();
-  if((yearNumStr && yearNumStr.includes(query)) || (yearLabel && yearLabel.includes(query))) return 3;
+  if(yearNumStr?.includes(query) || yearLabel?.includes(query)) return 3;
 
   const srcName = (entry.src.name || '').toLowerCase();
   if(srcName.includes(query)) return 4;

@@ -154,7 +154,7 @@ export function setState(patch){
 export function selectOverlayLayer(key){
   const nextKey = state.activeOverlayKey === key ? null : key;
   const patch = { activeOverlayKey: nextKey };
-  if(nextKey && nextKey.startsWith('hist:')){
+  if(nextKey?.startsWith('hist:')){
     const withoutKey = state.recentLayers.filter(k => k !== nextKey);
     patch.recentLayers = [nextKey, ...withoutKey].slice(0, RECENT_LAYERS_MAX);
   }

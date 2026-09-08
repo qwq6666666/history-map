@@ -303,7 +303,7 @@ function buildCustomSourceRow(entry){
   nameSpan.className = 'custom-source-name';
   nameSpan.textContent = entry.name;
   nameSpan.title = entry.type === 'wmts'
-    ? `WMTS：${entry.wmts && entry.wmts.layer || ''}（${entry.wmts && entry.wmts.matrixSet || ''}）`
+    ? `WMTS：${entry.wmts?.layer || ''}（${entry.wmts?.matrixSet || ''}）`
     : entry.urlTemplate;
 
   if(entry.type === 'wmts'){
@@ -381,13 +381,13 @@ function buildMultiLayerRow(entry, idx, total){
   opacityVal.textContent = entry.opacity + '%';
 
   opacityInput.addEventListener('input', ()=>{
-    const v = parseInt(opacityInput.value, 10);
+    const v = Number.parseInt(opacityInput.value, 10);
     opacityVal.textContent = v + '%';
     setLayerOpacity(entry.key, v/100); // 拖曳中：直接調圖層，不經過 store（見檔頭說明）
     map.render();
   });
   opacityInput.addEventListener('change', ()=>{
-    setMultiOverlayOpacity(entry.key, parseInt(opacityInput.value, 10)); // 放開才寫回 store
+    setMultiOverlayOpacity(entry.key, Number.parseInt(opacityInput.value, 10)); // 放開才寫回 store
   });
 
   const upBtn = document.createElement('button');

@@ -90,6 +90,8 @@ async function runImmediateSearch(){
       renderSuggestList(results);
     }
   }catch(e){
+    // 地理編碼請求失敗（網路錯誤、逾時等）在輸入過程中很常見，靜默隱藏建議
+    // 清單即可，不需要跳錯誤訊息打斷使用者輸入。
     if(!isSearchStale(myToken)) hideSuggest();
   }finally{
     if(!isSearchStale(myToken)) addressSearchBtn.classList.remove('loading');
@@ -116,15 +118,15 @@ export async function showLocationAndFindLayers(lon, lat, label, addr){
 async function selectGeocodeResult(result){
   hideSuggest();
   addressInput.value = result.display_name;
-  const lon = parseFloat(result.lon);
-  const lat = parseFloat(result.lat);
+  const lon = Number.parseFloat(result.lon);
+  const lat = Number.parseFloat(result.lat);
   await showLocationAndFindLayers(lon, lat, result.display_name, result.address || {});
 }
 
 function getCurrentPositionAsync(){
   return new Promise((resolve, reject)=>{
     if(!navigator.geolocation){
-      reject({ message: '您的瀏覽器不支援定位功能。' });
+      reject(new Error('您的瀏覽器不支援定位功能。'));
       return;
     }
     navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
@@ -141,8 +143,8 @@ async function handleLocateSuccess(pos, myToken){
   try{
     const rev = await reverseGeocode(lon, lat);
     if(isSearchStale(myToken)) return;
-    if(rev && rev.display_name) label = rev.display_name;
-    addr = (rev && rev.address) || {};
+    if(rev?.display_name) label = rev.display_name;
+    addr = rev?.address || {};
   }catch(e){
     // 反向地理編碼失敗（例如離線）時，退回用座標當標籤；
     // 圖層來源篩選會因為沒有縣市／鄉鎮資訊而保守地不排除，
@@ -156,11 +158,18 @@ async function handleLocateSuccess(pos, myToken){
 
 // 依 geolocation 錯誤的 code／message 組出對使用者友善的提示文字，
 // 從 locateSearchBtn 的 click handler 抽出，降低該 handler 的認知複雜度。
+// 注意：不能寫成 `err.code === err.PERMISSION_DENIED` 比對——這幾個常數只有
+// 瀏覽器原生 GeolocationPositionError 才會帶（該物件把 PERMISSION_DENIED／
+// POSITION_UNAVAILABLE／TIMEOUT 同時放在 instance 上），getCurrentPositionAsync()
+// 在瀏覽器不支援定位時是自己 reject(new Error(...))，err 上沒有這些常數，
+// 這種寫法會變成 `undefined === undefined` 恆真，永遠誤判成「已拒絕位置權限」。
+// 改用 Geolocation API 規格定義的固定數字代碼（1/2/3）直接比對，兩種來源
+// 的 err 都能正確判斷。
 function describeLocateError(err){
-  if(err && err.code === err.PERMISSION_DENIED) return '已拒絕位置權限，請至瀏覽器或系統設定允許此網站存取位置後再試一次。';
-  if(err && err.code === err.POSITION_UNAVAILABLE) return '目前無法判斷您的位置。';
-  if(err && err.code === err.TIMEOUT) return '定位逾時，請再試一次。';
-  if(err && err.message) return err.message;
+  if(err?.code === 1) return '已拒絕位置權限，請至瀏覽器或系統設定允許此網站存取位置後再試一次。'; // PERMISSION_DENIED
+  if(err?.code === 2) return '目前無法判斷您的位置。'; // POSITION_UNAVAILABLE
+  if(err?.code === 3) return '定位逾時，請再試一次。'; // TIMEOUT
+  if(err?.message) return err.message;
   return '無法取得目前位置，請稍後再試。';
 }
 
@@ -593,6 +602,8 @@ export function initSearchUI(){
         if(isSearchStale(myToken)) return;
         renderSuggestList(results);
       }catch(e){
+        // 同上（see selectGeocodeResult 附近的說明）：地理編碼請求失敗時
+        // 靜默隱藏建議清單即可，使用者輸入過程中不需要跳錯誤訊息。
         if(!isSearchStale(myToken)) hideSuggest();
       }
     }, 550);

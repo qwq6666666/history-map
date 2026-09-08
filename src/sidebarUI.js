@@ -321,6 +321,7 @@ export function initSidebar(){
 
   // 跨越 768px 門檻時（即使沒有切換國家分頁）也要重新同步顯示狀態，
   // 比照 src/ui/mobileLayout.js 監聽 matchMedia 變化的既有寫法。
+  // mq.addListener 是刻意保留給不支援 addEventListener 的舊版 Safari 的 fallback，SonarQube 的棄用警告可以忽略
   if(mq.addEventListener) mq.addEventListener('change', syncMobileBrowseView);
   else mq.addListener(syncMobileBrowseView);
 

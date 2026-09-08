@@ -75,7 +75,7 @@ function isPointNearExtent(lon, lat, ext){
 // 只有「有合法 bbox、且座標確定在範圍外」的候選才會被排除。純函式，
 // 不 mutate 傳入的 candidates 陣列，方便獨立測試。
 export function filterCandidatesByBbox(candidates, lon, lat){
-  return candidates.filter(c => pointInBbox(lon, lat, c.layer.region && c.layer.region.bbox));
+  return candidates.filter(c => pointInBbox(lon, lat, c.layer.region?.bbox));
 }
 
 /* ---------------------------------------------------------
@@ -285,12 +285,16 @@ function copyCoordText(text, btn){
     btn.classList.add('copied');
     setTimeout(()=> btn.classList.remove('copied'), 1500);
   };
-  if(navigator.clipboard && navigator.clipboard.writeText){
+  if(navigator.clipboard?.writeText){
     navigator.clipboard.writeText(text).then(flash).catch(()=>{});
     return;
   }
   // 非安全上下文（例如 http）navigator.clipboard 可能不存在，退回舊式做法；
   // 複製失敗就靜默略過，不影響搜尋結果本身的顯示。
+  // SonarQube javascript:S1874 複查：document.execCommand 雖已棄用，但目前
+  // 沒有涵蓋範圍相同的替代 API（Clipboard API 需要安全上下文），這裡刻意
+  // 只在 navigator.clipboard 不可用時才走這條 fallback 路徑，判定為可接受
+  // 的刻意選擇，維持原寫法。
   try{
     const ta = document.createElement('textarea');
     ta.value = text;
@@ -299,7 +303,7 @@ function copyCoordText(text, btn){
     document.body.appendChild(ta);
     ta.select();
     document.execCommand('copy');
-    document.body.removeChild(ta);
+    ta.remove();
     flash();
   }catch(e){ /* 略過 */ }
 }

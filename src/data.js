@@ -100,8 +100,8 @@ function resolveTileUrl(provider, layer){
 --------------------------------------------------------- */
 function yearSortValue(y){
   const s = String(y);
-  const m = s.match(/\d{3,4}/); // 抓出字串中第一組 3~4 位數字（例：1930s → 1930）
-  if(m) return parseInt(m[0], 10);
+  const m = /\d{3,4}/.exec(s); // 抓出字串中第一組 3~4 位數字（例：1930s → 1930）
+  if(m) return Number.parseInt(m[0], 10);
   if(s === '清') return 1850;    // 清代，無精確年份者排在最前
   if(s === '日治') return 1910;  // 日治時期通用標籤，概略排在日治中期
   if(s === '戰後') return 1950;  // 戰後通用標籤，概略排在戰後初期
@@ -155,7 +155,8 @@ function validateLayersBundle(layersData){
         ? cat.groups.map(g => g.layers)
         : [cat.layers];
       layerLists.forEach((layers, gi) => {
-        assertShape(Array.isArray(layers), `${ctag}${cat.groups ? ` groups[${gi}]` : ''} 缺少 layers 陣列`);
+        const groupSuffix = cat.groups ? ` groups[${gi}]` : '';
+        assertShape(Array.isArray(layers), `${ctag}${groupSuffix} 缺少 layers 陣列`);
         layers.forEach((l, li) => {
           const ltag = `${ctag} layers[${li}]`;
           assertShape(typeof l.id === 'string' && l.id, `${ltag} 缺少 id`);
@@ -506,7 +507,7 @@ export function extractPlaceKeywords(addr){
   addr = addr || {};
   const rawFields = PLACE_ADDR_FIELDS.map(key => addr[key]);
   const keywords = new Set();
-  const aliases = (DATA.HISTORICAL_NAMES && DATA.HISTORICAL_NAMES.aliases) || {};
+  const aliases = DATA.HISTORICAL_NAMES?.aliases || {};
   rawFields.forEach(name=>{
     const trimmed = (name || '').trim();
     if(!trimmed) return;
