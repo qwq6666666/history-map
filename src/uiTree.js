@@ -22,11 +22,64 @@
    false，維持「可同時展開多個」的原行為。
 --------------------------------------------------------- */
 
+// 圖例預覽 Modal：全站共用同一個 DOM（lazy singleton），桌機／手機都走
+// 這一套，只靠 CSS media query 切換置中卡片／全螢幕呈現，避免維護兩套邏輯。
+let legendModalEls = null;
+function ensureLegendModal(){
+  if (legendModalEls) return legendModalEls;
+  const overlay = document.createElement('div');
+  overlay.className = 'legend-modal-overlay';
+  overlay.style.display = 'none';
+  overlay.innerHTML = `
+    <div class="legend-modal-card">
+      <button type="button" class="legend-modal-close" aria-label="關閉圖例">✕</button>
+      <div class="legend-modal-body">
+        <img class="legend-modal-img" alt="圖例">
+        <p class="legend-modal-error" style="display:none;">圖例載入失敗</p>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const card = overlay.querySelector('.legend-modal-card');
+  const img = overlay.querySelector('.legend-modal-img');
+  const errorMsg = overlay.querySelector('.legend-modal-error');
+  const closeBtn = overlay.querySelector('.legend-modal-close');
+
+  const close = () => { overlay.style.display = 'none'; img.src = ''; };
+  overlay.addEventListener('click', close); // 點擊遮罩關閉
+  card.addEventListener('click', (e) => e.stopPropagation()); // 卡片本身不觸發遮罩關閉
+  closeBtn.addEventListener('click', close);
+
+  legendModalEls = { overlay, img, errorMsg, close };
+  return legendModalEls;
+}
+
+function showLegendModal(url){
+  const { overlay, img, errorMsg } = ensureLegendModal();
+  errorMsg.style.display = 'none';
+  img.style.display = '';
+  img.onerror = () => { img.style.display = 'none'; errorMsg.style.display = ''; };
+  img.src = url;
+  overlay.style.display = 'flex';
+}
+
 export function buildLayerItem(layer, onLayerClick){
   const item = document.createElement('div');
   item.className = 'layer-item';
   item.dataset.layerId = layer.id;
   item.innerHTML = `<span class="layer-year">${layer.year}</span><span class="layer-title">${layer.title}</span>`;
+  if (layer.legend) {
+    const legendBtn = document.createElement('button');
+    legendBtn.type = 'button';
+    legendBtn.className = 'layer-legend-btn';
+    legendBtn.title = '圖例';
+    legendBtn.setAttribute('aria-label', '圖例');
+    legendBtn.textContent = '🛈';
+    legendBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showLegendModal(layer.legend);
+    });
+    item.appendChild(legendBtn);
+  }
   item.addEventListener('click', ()=> onLayerClick(layer, item));
   return item;
 }
@@ -57,7 +110,7 @@ export function appendLayerList(container, layers, onLayerClick, threshold = 8){
   container.appendChild(toggleBtn);
 }
 
-export function buildCategoryList(categories, container, onLayerClick, openFirst, singleOpen = true){
+export function buildCategoryList(categories, container, onLayerClick, openFirst, singleOpen = true, onCategoryOpen = null){
   categories.forEach((cat, ci) => {
     const wrap = document.createElement('div');
     wrap.className = 'category';
@@ -77,6 +130,17 @@ export function buildCategoryList(categories, container, onLayerClick, openFirst
         });
       }
       wrap.classList.toggle('open');
+      if(opening && singleOpen){
+        // 比照 sidebarUI.js 展開「來源」時的行為：展開分類後自動捲動，
+        // 讓分類標題貼齊側邊欄可視範圍頂端（.category-head 的
+        // scroll-margin-top 已避開吸附的透明度區塊，見 style.css）。
+        head.scrollIntoView({ behavior:'smooth', block:'start' });
+        // 只有呼叫端明確傳入 onCategoryOpen 才會觸發（目前只有
+        // sidebarUI.js 對日本／韓國／東南亞這幾個「分類＝城市」的
+        // 來源傳入，把地圖移到該分類的地理範圍；其他呼叫端不傳、
+        // 其他來源不受影響）。
+        if(onCategoryOpen) onCategoryOpen(cat);
+      }
     });
 
     const body = document.createElement('div');

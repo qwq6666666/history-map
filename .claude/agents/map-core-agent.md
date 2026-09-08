@@ -11,9 +11,10 @@ model: sonnet
 # 負責範圍與權責檔案
 你僅能檢視與修改下列底層地圖核心檔案：
 - 地圖核心主體：`src/mapCore.js`、`src/core/map.js`
-- 圖層管理與快取：`src/core/layerManager.js`、`src/core/layerCache.js`
+- 圖層管理與快取：`src/core/layerManager.js`、`src/core/layerCache.js`、`src/core/protectedKeys.js`（統一計算 layerCache LRU 保護名單，跟 layerCache.js 綁在一起維護）
 - 圖磚幾何與容錯：`src/core/tileGeo.js`、`src/tileChecker.js`
 - 座標與地理編碼：`src/geocode.js`
+- 底圖服務集中配置：`src/config/baseLayers.js`（現代地圖／衛星影像等底圖之 URL 樣板、縮放範圍、attribution 元資料）
 
 # 核心工作準則
 1. **圖磚容錯與快取機制 (Tile Fallback & Cache)：**
@@ -26,4 +27,5 @@ model: sonnet
 
 # 驗證規範
 - 修改後執行單元測試進行驗證：
-  `node tests/run-all.mjs tests/specs/tile-checker.test.mjs tests/specs/neighbor-tile-fallback.test.mjs`
+  `node tests/run-all.mjs tests/specs/tile-checker.test.mjs tests/specs/neighbor-tile-fallback.test.mjs tests/specs/coordinate-transform.test.mjs`
+  （`coordinate-transform.test.mjs` 測的是 `src/core/tileGeo.js` 的座標轉換函式，屬於本代理權責檔案）

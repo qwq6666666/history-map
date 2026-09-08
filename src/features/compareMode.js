@@ -24,6 +24,7 @@ import { buildCategoryList } from '../uiTree.js';
 import { map } from '../core/map.js';
 import { collapseSidebar } from '../ui/sidebarToggle.js';
 import { getOrCreateSource } from '../core/layerCache.js';
+import { getProtectedKeys } from '../core/protectedKeys.js';
 import { createCountryFilterBar } from '../ui/countryFilter.js';
 
 let swipeDividerEl, compareWrapA, compareWrapB;
@@ -51,11 +52,10 @@ export function enterCompareMode(){
   compareWrapB.classList.add('show');
 
   // 左側初始值以「透明疊圖」目前選擇的圖層為準（沒選歷史圖層則用目前底圖）。
-  // 這是進入比對模式當下算出來的預設值，直接寫回 store（跟原本
-  // pickerValues.A = activeOverlayKey || currentBaseKey 是同一件事），
-  // 不用另外呼叫 setState() 觸發第二次廣播。
+  // 這是進入比對模式當下算出來的預設值，透過既有的 setCompareSide()
+  // 寫回 store，讓其他訂閱者也能收到這次狀態變更的廣播。
   const currentBaseKey = store.baseLayer === 'sat' ? 'base:sat' : 'base:osm';
-  store.compareA = store.activeOverlayKey || currentBaseKey;
+  setCompareSide('A', store.activeOverlayKey || currentBaseKey);
 
   if(runtime.historyLayer){ map.removeLayer(runtime.historyLayer); runtime.historyLayer = null; }
   document.querySelectorAll('.layer-item.active').forEach(el=>el.classList.remove('active'));
@@ -96,11 +96,10 @@ function resolveSourceForCompareKey(key){
 }
 
 function getCompareProtectedKeys(){
-  const keys = new Set();
-  if(typeof store.compareA === 'string' && store.compareA.startsWith('hist:')) keys.add(store.compareA);
-  if(typeof store.compareB === 'string' && store.compareB.startsWith('hist:')) keys.add(store.compareB);
-  if(store.activeOverlayKey) keys.add(store.activeOverlayKey);
-  return keys;
+  // 統一改用 core/protectedKeys.js 的 getProtectedKeys()，避免自己維護一份
+  // 子集漏掉 store.multiOverlayLayers／runtime.historyLayerKey，導致複合疊圖
+  // 選好的圖層在比對模式底下被 layerCache 的 LRU 誤淘汰。
+  return getProtectedKeys();
 }
 
 function rebuildSwipeLayer(side, key){
@@ -168,11 +167,34 @@ export function positionDivider(){
   swipeDividerEl.style.left = (w * store.swipePercent/100) + 'px';
 }
 
+// 分隔線可拖曳的判定範圍：以「目前分隔線實際 x 座標」為中心，左右各再擴大
+// 這麼多 px 都算命中，不用精準點在 34px 的 #swipeHandle 圓形上（手機上很難點準）。
+const DIVIDER_HIT_MARGIN = 22;
+
 function initSwipeDivider(){
-  document.getElementById('swipeHandle').addEventListener('pointerdown', (e)=>{
+  function startDrag(e){
     runtime.dragging = true;
     e.preventDefault();
-  });
+  }
+
+  document.getElementById('swipeHandle').addEventListener('pointerdown', startDrag);
+
+  // #swipeDivider／#swipeLine 都設了 pointer-events:none（分隔線視覺本身不擋
+  // 地圖操作），所以點在分隔線附近但沒點準把手時，pointerdown 會直接落在
+  // #map 底下的 OL 畫布上。這裡在 #map 用 capture 階段攔截：算出目前分隔線
+  // 實際 x 座標，落在 ±DIVIDER_HIT_MARGIN px 範圍內就視為要拖曳分隔線，並
+  // stopPropagation() 讓事件不再往下傳給 OL 自己的拖曳平移監聽，效果等同
+  // 直接點中把手；非比對模式或距離太遠則完全不介入，事件正常流向地圖。
+  document.getElementById('map').addEventListener('pointerdown', (e)=>{
+    if(store.mode !== 'compare') return;
+    const mapEl = document.getElementById('map');
+    const rect = mapEl.getBoundingClientRect();
+    const dividerX = rect.left + rect.width * (store.swipePercent / 100);
+    if(Math.abs(e.clientX - dividerX) > DIVIDER_HIT_MARGIN) return;
+    startDrag(e);
+    e.stopPropagation();
+  }, true);
+
   window.addEventListener('pointerup', ()=> runtime.dragging = false);
   window.addEventListener('pointercancel', ()=> runtime.dragging = false);
   window.addEventListener('pointermove', (e)=>{

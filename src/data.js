@@ -68,7 +68,8 @@ const SOURCE_COUNTRY = {
   hakkaliudui: 'tw', yilan: 'tw', hualien: 'tw', kinmen: 'tw',
   beijing: 'cn', tianjin: 'cn', shanghai: 'cn', nanjing: 'cn', hangzhou: 'cn',
   wuhan: 'cn', guangzhou: 'cn', kunming: 'cn', suzhou: 'cn', hongkong: 'cn',
-  ccts: 'cn'
+  ccts: 'cn', nlsc: 'tw',
+  tamsui: 'tw', puli: 'tw', penghu: 'tw', taitung: 'tw'
 };
 function countryForSourceId(id){
   return SOURCE_COUNTRY[id] || 'other';
@@ -226,7 +227,9 @@ export async function loadAppData(){
       scale: l.scale,      // 比例尺字串（例如 "1:25000"）或 null，未來篩選用（新增）
       type: l.type,        // 圖層類型（地形圖／地籍圖／行政區劃圖…）或 null，搜尋結果類型篩選用
       keywords: l.keywords || [], // 關鍵字陣列，未提供時給空陣列
-      url: l.url // 只有 udd 圖層會用到（file-exists 樣板來源沒有這個欄位）
+      url: l.url, // 只有 udd 圖層會用到（file-exists 樣板來源沒有這個欄位）
+      region: l.region || null, // 圖層自身的 WGS84 bbox（選填），供空間索引篩選用，沒有時 fallback 為 null
+      legend: l.legend || null, // 圖例頁面 URL（選填），沒有時 fallback 為 null，UI 端用來決定要不要顯示圖例按鈕
     });
     const categories = src.categories.map(cat => {
       if(cat.groups){

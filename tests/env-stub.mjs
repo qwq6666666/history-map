@@ -32,6 +32,15 @@ class FakeClassList {
   contains(c){ return this._node._classes.has(c); }
 }
 
+// 記錄「曾經被程式碼動態指定過 .id 的字串」，用來跟 elementCache 那套
+// 「HTML 裡本來就寫死、隨時 getElementById 都應該生得出來」的假設區分：
+// 一旦某個 id 曾經透過 `node.id = '...'` 動態指定過（例如
+// customTimelineUI.js 建立浮動 dock 時），代表它是「執行期動態插入／
+// 移除」的節點，被移除後 document.getElementById() 就應該老實回傳
+// 找不到，不能落回 getOrCreate() 自動生一個假的出來頂替（那樣會讓
+// 「關閉後應該找不到」這種測試永遠測不出來）。
+const dynamicIds = new Set();
+
 export class FakeNode {
   constructor(tag){
     this.tag = tag;
@@ -45,6 +54,8 @@ export class FakeNode {
     this.value = '100';
     this.style = {};
   }
+  set id(v){ this._id = v; if(v) dynamicIds.add(v); }
+  get id(){ return this._id; }
   get classList(){ return new FakeClassList(this); }
   set className(v){ this._classes = new Set(String(v).split(/\s+/).filter(Boolean)); }
   get className(){ return [...this._classes].join(' '); }
@@ -58,6 +69,13 @@ export class FakeNode {
     c.parentElement = this;
     return c;
   }
+  removeChild(c){
+    const i = this.children.indexOf(c);
+    if(i >= 0) this.children.splice(i, 1);
+    c.parentElement = null;
+    return c;
+  }
+  remove(){ if(this.parentElement) this.parentElement.removeChild(this); }
   addEventListener(ev, fn){ (this._listeners[ev] = this._listeners[ev] || []).push(fn); }
   removeEventListener(ev, fn){
     const arr = this._listeners[ev] || [];
@@ -89,6 +107,11 @@ export class FakeNode {
   }
   scrollIntoView(){}
   getBoundingClientRect(){ return { height: 20, width: parseFloat(this.attrs.width || 800), left: 0 }; }
+  // 沒有真的排版引擎，clientWidth 跟 getBoundingClientRect().width 用同一份
+  // 假設（attrs.width 可指定，否則預設 800），供 features/compareMode.js 的
+  // positionDivider() 這類「讀容器寬度算像素位置」的邏輯在測試環境下有值
+  // 可用，不會因為 undefined 算出 NaN。
+  get clientWidth(){ return parseFloat(this.attrs.width || 800); }
   set innerHTML(v){ this.children = []; this._innerHTML = v; }
   get innerHTML(){ return this._innerHTML || ''; }
 }
@@ -125,8 +148,34 @@ function getOrCreate(id){
   return elementCache[id];
 }
 
+// 真的 <body> 節點：程式碼裡用 document.body.appendChild(...) 動態掛上去的
+// 元素（例如 features/customTimelineUI.js 的浮動 dock）會是這個節點的
+// 子孫，跟既有「以 id 各自獨立存在」的 elementCache 是不同的兩棵樹——
+// elementCache 模擬的是「HTML 裡本來就寫死的元素」，document.body 這棵樹
+// 模擬的是「執行期間用 JS 動態插入畫面的元素」，兩者用途不同但都要能被
+// getElementById／querySelectorAll 找到。
+const bodyNode = new FakeNode('body');
+
+function findByIdInTree(node, id){
+  if(!node) return null;
+  if(node.id === id) return node;
+  for(const child of (node.children || [])){
+    const found = findByIdInTree(child, id);
+    if(found) return found;
+  }
+  return null;
+}
+
 globalThis.document = {
-  getElementById: (id) => getOrCreate(id),
+  getElementById: (id) => {
+    if(elementCache[id]) return elementCache[id];
+    const found = findByIdInTree(bodyNode, id);
+    if(found) return found;
+    // 曾經動態掛過這個 id、現在卻找不到＝真的被移除了，老實回傳
+    // null（不要落回 getOrCreate 自動生一個假的出來頂替）。
+    if(dynamicIds.has(id)) return null;
+    return getOrCreate(id);
+  },
   createElement: (tag) => new FakeNode(tag),
   createElementNS: (ns, tag) => new FakeNode(tag),
   querySelector(sel){ return this.querySelectorAll(sel)[0] || null; },
@@ -136,10 +185,13 @@ globalThis.document = {
       results.push(...root.querySelectorAll(sel));
       if(matchesSelector(root, sel)) results.push(root);
     });
+    results.push(...bodyNode.querySelectorAll(sel));
+    if(matchesSelector(bodyNode, sel)) results.push(bodyNode);
     return results;
   },
   documentElement: { style: { setProperty(){} } },
   addEventListener(){},
+  body: bodyNode,
 };
 
 const windowListeners = {};
@@ -161,6 +213,13 @@ else { globalThis.navigator = { geolocation: null }; }
 globalThis.alert = (msg) => {};
 globalThis.confirm = () => true;
 globalThis.prompt = () => '';
+
+// Node 沒有全域 requestAnimationFrame；src/ 底下若用到（例如
+// ui/search.js 的 buildSelectionList() 用來觸發進場動畫 class），
+// 這裡用 setTimeout(fn, 0) 頂替即可，不需要真的對齊畫面更新頻率。
+if(!globalThis.requestAnimationFrame){
+  globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+}
 
 // 簡易 in-memory localStorage 假物件，供 store.js 的自訂圖層清單
 // 讀寫測試使用；只需要 getItem/setItem 兩個方法。
@@ -194,7 +253,9 @@ globalThis.fetch = async (url) => {
 /* ---------- 假 OpenLayers ---------- */
 
 class FakeTileSource {
-  constructor(opts){ this.opts = opts; }
+  constructor(opts){ this.opts = opts; this._attributions = (opts && opts.attributions) || null; }
+  getAttributions(){ return this._attributions; }
+  setAttributions(attr){ this._attributions = attr; }
 }
 // 假 ol.source.WMTS：跟 FakeTileSource 一樣只記錄 opts，另外掛一個
 // static optionsFromCapabilities()，讓 tests/specs/wmts-import.test.mjs
@@ -229,6 +290,16 @@ class FakeVectorSource {
   removeFeature(f){ this._features = this._features.filter(x => x !== f); }
   getFeatures(){ return this._features; }
   clear(){ this._features = []; }
+}
+// 假 ol.Feature：給 ol.format.GeoJSON#readFeatures() 用，_props 這個內部
+// 欄位名稱刻意跟 writeFeatures() 讀取 f._props 的用法一致，讀進來的 feature
+// 之後如果又被拿去 exportGeoJSON()，writeFeatures 才讀得到同一份 properties。
+class FakeFeature {
+  constructor(props, geometry){ this._props = props || {}; this._geometry = geometry; }
+  get(k){ return this._props[k]; }
+  set(k, v){ this._props[k] = v; }
+  getGeometry(){ return this._geometry; }
+  changed(){}
 }
 class FakeTileLayer {
   constructor(opts){ this.opts = opts; this._opacity = (opts && opts.opacity !== undefined) ? opts.opacity : 1; this._visible = !opts || opts.visible !== false; this._zIndex = undefined; }
@@ -270,6 +341,7 @@ class FakeMap {
     this._moveendHandlers = [];
     this._interactions = [];
     this._layers = [];
+    this._viewport = new FakeNode('div');
   }
   getView(){
     const self = this;
@@ -285,7 +357,7 @@ class FakeMap {
   addOverlay(){}
   getTargetElement(){ return null; }
   getSize(){ return [800, 600]; }
-  getViewport(){ return { querySelectorAll: () => [] }; }
+  getViewport(){ return this._viewport; }
   render(){}
   renderSync(){}
   once(ev, fn){ if(ev === 'rendercomplete') fn(); }
@@ -319,6 +391,16 @@ globalThis.ol = {
           type: 'FeatureCollection',
           opts,
           features: features.map(f => ({ type: 'Feature', properties: f._props })),
+        });
+      }
+      // 假的「文字/物件 -> feature 陣列」轉換，給 drawTool.js 的
+      // importGeoJSON() 使用；opts 目前用不到（真的 OL 會拿來做座標轉換），
+      // 這裡單純忽略，測試不需要驗證投影轉換邏輯。
+      readFeatures(input, opts){
+        const obj = typeof input === 'string' ? JSON.parse(input) : input;
+        return (obj.features || []).map(f => {
+          const geometry = { getType: () => f.geometry && f.geometry.type };
+          return new FakeFeature({ ...(f.properties || {}) }, geometry);
         });
       }
     },

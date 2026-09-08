@@ -10,6 +10,12 @@
     --sans:'Public Sans', -apple-system, sans-serif;
   }
   *{box-sizing:border-box;}
+  /* 有些既有 class（.address-search-btn／.layer-list-toggle／
+     .current-layer-fav-btn 等）自己設定了 display:flex/block，specificity
+     跟 [hidden] 的 UA 預設一樣，author 樣式會蓋掉 UA 樣式，導致 JS 設
+     element.hidden = true 卻沒有真的隱藏。這裡統一補回 [hidden] 的優先權，
+     所有用 .hidden 屬性控制顯示的元素都適用，不用每個 class 各自補一次。 */
+  [hidden]{display:none !important;}
   html,body{margin:0;padding:0;height:100%;font-family:var(--sans);background:var(--ink);}
   #map{position:absolute;inset:0;background:#0e1512;}
 
@@ -32,7 +38,8 @@
     overflow:visible;
   }
   #sidebar.collapsed .sidebar-body,
-  #sidebar.collapsed .sidebar-header-text{display:none;}
+  #sidebar.collapsed .sidebar-header-text,
+  #sidebar.collapsed .tour-btn-row{display:none;}
   #sidebar.collapsed .sidebar-header{
     padding:0; border-bottom:none; height:100%;
     align-items:center; justify-content:center;
@@ -42,10 +49,13 @@
   }
 
   .sidebar-header{
-    display:flex; align-items:flex-start; justify-content:space-between;
+    display:flex; flex-direction:column;
     padding:18px 18px 14px;
     border-bottom:1px solid var(--rule);
     flex-shrink:0;
+  }
+  .sidebar-header-top{
+    display:flex; align-items:flex-start; justify-content:space-between;
   }
   .sidebar-header-text h1{
     font-family:var(--serif); font-weight:600; font-size:19px;
@@ -168,7 +178,20 @@
   .layer-item.active .layer-title{color:var(--paper);}
   .layer-item.active .layer-year{color:var(--brass);}
   .layer-year{font-family:var(--serif); font-size:12px; color:var(--rule); width:40px; flex-shrink:0;}
-  .layer-title{font-size:12.5px; color:var(--ink); line-height:1.35;}
+  .layer-title{font-size:12.5px; color:var(--ink); line-height:1.35; min-width:0;}
+
+  /* 圖例小圖示（layer.legend 存在時才由 uiTree.js 附加），沿用
+     .current-layer-fav-btn 的圓形小按鈕視覺，但縮小尺寸以配合
+     .layer-item 較緊湊的行高，避免跟 .layer-year／.layer-title 擠壓換行。 */
+  .layer-legend-btn{
+    flex-shrink:0; margin-left:auto; width:18px; height:18px; padding:0; line-height:1;
+    background:var(--paper); border:1px solid var(--rule); border-radius:50%;
+    font-size:11px; color:var(--rule); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .layer-legend-btn:hover{border-color:var(--brass-dark); color:var(--brass-dark);}
+  .layer-item.active .layer-legend-btn{background:var(--ink); border-color:var(--rule); color:var(--brass);}
+  .layer-item.active .layer-legend-btn:hover{border-color:var(--brass); color:var(--brass);}
 
   /* 單一分類／次分類底下圖層數過多時，預設只顯示前 8 筆（見 uiTree.js
      appendLayerList()），其餘項目先隱藏，避免手風琴展開後清單過長。不用
@@ -296,6 +319,48 @@
 
   }
 
+  /* ---------- 繪圖顏色色票（工具列預設色 ＋ 要素編輯彈窗共用） ---------- */
+  .draw-color-palette{display:flex; align-items:center; gap:5px; flex-wrap:wrap;}
+  .draw-color-swatch{
+    width:20px; height:20px; border-radius:50%; padding:0;
+    border:1px solid var(--rule); cursor:pointer;
+    box-shadow:none;
+  }
+  .draw-color-swatch:hover{border-color:var(--ink);}
+  .draw-color-swatch.active{
+    border:2px solid var(--ink);
+    box-shadow:0 0 0 2px var(--paper), 0 0 0 3px var(--stamp);
+  }
+  .draw-color-custom,
+  input[type="color"].draw-color-custom{
+    width:20px; height:20px; border-radius:50%; overflow:hidden;
+    border:1px solid var(--rule); padding:0; cursor:pointer; background:none;
+  }
+  .draw-color-custom::-webkit-color-swatch-wrapper{padding:0;}
+  .draw-color-custom::-webkit-color-swatch{border:none; border-radius:50%;}
+  .draw-color-custom::-moz-color-swatch{border:none; border-radius:50%;}
+
+  /* ---------- 要素編輯彈窗（畫布上點選圖形後彈出，定位由 ol.Overlay 處理） ---------- */
+  .draw-feature-popup{
+    position:absolute; z-index:11; min-width:220px;
+    background:var(--paper); border:1px solid var(--rule); border-radius:4px;
+    box-shadow:0 4px 14px rgba(0,0,0,.35);
+    padding:10px 12px; font-family:var(--sans); font-size:12px; color:var(--ink);
+  }
+  .draw-feature-popup-title{font-weight:600; font-size:12.5px; color:var(--ink);}
+  .draw-feature-popup-name{
+    display:block; width:100%; box-sizing:border-box;
+    margin-bottom:8px; padding:5px 7px;
+    background:#fff; border:1px solid var(--rule); border-radius:2px;
+    font-family:var(--sans); font-size:12px; color:var(--ink);
+  }
+  .draw-feature-popup-delete{
+    display:block; width:100%; margin-top:8px; padding:6px 8px;
+    background:var(--paper); color:#b3261e; border:1px solid #e2a29c; border-radius:2px;
+    font-family:var(--sans); font-size:12px; cursor:pointer;
+  }
+  .draw-feature-popup-delete:hover{background:#fbe9e7; border-color:#b3261e;}
+
   /* ---------- Date stamp (signature element) ---------- */
   #stamp{
     position:absolute; right:22px; bottom:22px; z-index:10;
@@ -358,6 +423,10 @@
   }
   .locate-toast.show{display:block;}
 
+  .draw-storage-toast{
+    top:auto; bottom:16px; right:16px;
+  }
+
   .locate-marker{
     position:absolute; z-index:8; width:0; height:0; display:none; pointer-events:none;
   }
@@ -372,6 +441,7 @@
 
   @media (max-width:640px){
     .locate-toast{right:10px; max-width:70vw;}
+    .draw-storage-toast{right:10px;}
   }
 
   /* ---------- 地址搜尋 ---------- */
@@ -430,6 +500,10 @@
     margin-top:8px; padding-top:8px; border-top:1px dashed var(--rule);
     font-family:var(--sans); font-size:12px; color:var(--ink); line-height:1.5;
   }
+  /* Identify Pin 彈窗已有實線 header 分隔，這裡的座標資訊區塊不需要再疊一條
+     虛線分隔線（避免 header 底線 + 虛線同時出現），僅限定在彈窗內覆寫，
+     不影響搜尋結果卡片（.location-result 內）沿用的原始 .coord-info 樣式。 */
+  .identify-popup-body .coord-info{border-top:none; padding-top:0; margin-top:0;}
   .coord-info-row{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
     margin-bottom:4px;
@@ -438,7 +512,10 @@
   .coord-info-label{
     color:var(--brass-dark); font-weight:600; font-size:11px; letter-spacing:.02em; flex-shrink:0;
   }
-  .coord-info-value{flex:1; min-width:0; font-variant-numeric:tabular-nums; word-break:normal; overflow-wrap:break-word;}
+  .coord-info-value{
+    flex:1; min-width:0; font-variant-numeric:tabular-nums; white-space:nowrap;
+    font-family:'SFMono-Regular',Consolas,'Courier New',monospace;
+  }
   .coord-copy-btn{
     flex-shrink:0; background:none; border:1px solid var(--rule); border-radius:2px;
     color:var(--ink); font-family:var(--sans); font-size:11px; line-height:1;
@@ -449,6 +526,54 @@
 
   .avail-progress{font-size:11.5px; color:var(--rule); padding:4px 2px;}
   .avail-empty{font-size:12px; color:var(--rule); line-height:1.6; padding:4px 2px; margin:0 0 4px;}
+
+  /* 搜尋結果面板表頭：說明文字 + 「自訂時間軸(多選)」切換按鈕同一列，
+     窄側邊欄允許換行，避免爆版。 */
+  .avail-summary-row{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:8px; flex-wrap:wrap; margin:0 0 4px;
+  }
+  .avail-summary-row .avail-empty{margin:0; flex:1 1 auto; min-width:120px;}
+  .avail-multiselect-btn{
+    flex-shrink:0; font-size:11.5px; font-weight:600; padding:5px 10px;
+    background:var(--paper); color:var(--brass-dark); border:1px solid var(--brass-dark);
+    border-radius:12px; cursor:pointer; white-space:nowrap;
+    transition:background .15s ease, color .15s ease;
+  }
+  .avail-multiselect-btn:hover{background:var(--brass-dark); color:var(--paper);}
+  .layer-avail-panel.selection-mode .avail-multiselect-btn{
+    background:var(--ink); color:var(--paper); border-color:var(--ink);
+  }
+
+  /* 自訂時間軸多選模式：獨立扁平清單（不透過 uiTree.js 的手風琴渲染），
+     每筆一張卡片，左側 checkbox 用 width/opacity transition 做「平滑
+     展開」效果（清單插入 DOM 後下一影格才加上 .ready，觸發過渡），
+     不用 display:none 硬切。 */
+  .avail-select-list{display:flex; flex-direction:column; gap:5px; margin:2px 0 4px;}
+  .avail-select-item{
+    display:flex; align-items:center; gap:0;
+    padding:7px 9px; border:1px solid var(--rule); border-radius:3px;
+    background:var(--paper); cursor:pointer;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .avail-select-item:hover{background:var(--paper-dim);}
+  .avail-select-item.checked{background:rgba(181,140,74,.14); border-color:var(--brass-dark);}
+  /* 「已勾選要納入時間軸」(.checked，brass 底色) 跟「目前在地圖上瞬態
+     預覽中」(.is-previewing，stamp 外框) 是兩件獨立的事，卡片可能同時
+     符合兩者，用外框 outline 疊加而不是改背景色，避免互相蓋掉看不出來。 */
+  .avail-select-item.is-previewing{
+    outline:2px solid var(--stamp); outline-offset:-1px; border-color:var(--stamp);
+  }
+  .avail-select-checkbox-wrap{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:0; opacity:0; overflow:hidden; flex-shrink:0; margin-right:0;
+    transition:width .2s ease, opacity .2s ease, margin-right .2s ease;
+  }
+  .avail-select-list.ready .avail-select-checkbox-wrap{width:18px; opacity:1; margin-right:9px;}
+  .avail-select-checkbox{width:16px; height:16px; flex-shrink:0; cursor:pointer; accent-color:var(--brass-dark);}
+  .avail-select-info{flex:1; min-width:0;}
+  .avail-select-title{font-size:12.5px; color:var(--ink); line-height:1.35;}
+  .avail-select-meta{font-size:11px; color:var(--rule); margin-top:2px;}
 
   /* 搜尋結果面板頂端的「全部／類型／年代」頁籤列：純前端在已取得的
      available 陣列上重新分組／排序，視覺上沿用 .segmented 那套淡雅、
@@ -483,39 +608,60 @@
      微調左側留白，跟 .source-body 既有的 padding-left 疊加起來不會太擠。 */
   .avail-layer-list .layer-item{padding-left:4px;}
 
-  /* 時間軸模式（timelineMode.js）專用樣式，搜尋結果面板已不再使用時間軸檢視 */
-  .timeline-scroll{overflow-x:auto; padding:4px 2px 8px; -webkit-overflow-scrolling:touch;}
-  .timeline-svg{display:block;}
-  .timeline-tick-label{font-size:10px; fill:var(--rule); font-family:var(--sans);}
-
-  /* 時間軸：箭頭形狀，顏色代表播放進度 */
-  .timeline-arrow{
-    fill:var(--paper); stroke:var(--rule); stroke-width:1.2; cursor:pointer;
-    transition:fill .15s ease, stroke .15s ease;
+  /* 時間軸模式（timelineMode.js）專用樣式，搜尋結果面板已不再使用時間軸檢視。
+     視覺語彙直接比照自訂時間軸浮動 dock（features/customTimelineUI.js／
+     .custom-timeline-*）抄一份數值：圓點刻度＋滑桿＋brass 強調色的深色
+     卡片語言，兩邊 class 前綴各自獨立（.timeline-* vs .custom-timeline-*）、
+     不共用同一條規則，只是看起來像同一套設計。 */
+  .timeline-dots{
+    display:flex; align-items:flex-start; gap:6px;
+    margin-bottom:6px; padding:2px 2px 4px;
+    overflow-x:auto; -webkit-overflow-scrolling:touch;
   }
-  .timeline-arrow:hover{stroke:var(--brass-dark);}
-  .timeline-arrow.passed{fill:var(--brass); stroke:var(--brass-dark);}
-  .timeline-arrow.active{fill:var(--stamp); stroke:var(--stamp);}
-  .timeline-svg.dragging .timeline-arrow{cursor:grabbing;}
+  .timeline-dot-wrap{
+    display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0;
+    min-width:28px;
+  }
+  /* 圓點刻度：沿用 .layer-item 讓 syncActiveLayerItemClasses() 能正確同步
+     「目前實際套疊中」高亮，這裡的規則要蓋掉 .layer-item 原本 display:flex
+     ／padding／background 等 list-item 樣式（後宣告的同specificity規則
+     蓋掉先宣告的，見 .layer-item 定義處），改成一顆圓點。 */
+  .timeline-dot{
+    display:block; width:11px; height:11px; padding:0; border-radius:50%;
+    background:rgba(255,255,255,.3); border:1px solid rgba(255,255,255,.5);
+    cursor:pointer; transition:background .15s ease, border-color .15s ease;
+  }
+  .timeline-dot:hover{background:rgba(255,255,255,.5);}
+  .timeline-dot.passed{background:var(--brass); border-color:var(--brass-dark);}
+  .timeline-dot.active{background:var(--stamp); border-color:var(--stamp);}
+  .timeline-dot-label{
+    font-size:10px; color:rgba(255,255,255,.65); white-space:nowrap; cursor:pointer;
+  }
 
-  .timeline-undated{margin-top:10px; padding-top:8px; border-top:1px dashed var(--rule);}
-  .timeline-undated-label{font-size:11px; color:var(--rule); margin-bottom:6px;}
+  .timeline-undated{margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,.2);}
+  .timeline-undated-label{font-size:11px; color:rgba(255,255,255,.7); margin-bottom:6px;}
   .timeline-undated-list{display:flex; flex-wrap:wrap; gap:6px;}
   .timeline-undated-chip{
-    font-size:11.5px; padding:5px 10px; background:var(--paper); border:1px solid var(--rule);
+    font-size:11.5px; padding:5px 10px; background:rgba(255,255,255,.08); color:var(--paper);
+    border:1px solid rgba(255,255,255,.4);
     border-radius:14px; cursor:pointer; white-space:nowrap;
   }
-  .timeline-undated-chip:hover{background:var(--paper-dim);}
-  .timeline-undated-chip.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .timeline-undated-chip:hover{background:rgba(255,255,255,.18);}
+  .timeline-undated-chip.active{background:var(--stamp); color:var(--paper); border-color:var(--stamp);}
 
-  /* 時間軸：自動播放 */
-  .timeline-controls{margin:1px 2px 3px;}
-  .timeline-play-btn{
-    font-size:11px; padding:3px 10px; background:var(--paper); color:var(--ink);
-    border:1px solid var(--rule); border-radius:12px; cursor:pointer;
+  /* 時間軸：播放列（播放/暫停鈕＋加速播放鈕＋橫向滑桿），數值直接比照
+     .custom-timeline-slider-row／.custom-timeline-play-btn／
+     .custom-timeline-speed-btn 抄一份。 */
+  .timeline-slider-row{margin:2px 0 4px; display:flex; align-items:center; gap:8px;}
+  .timeline-slider{flex:1; min-width:0; accent-color:var(--brass-dark);}
+  .timeline-play-btn, .timeline-speed-btn{
+    flex-shrink:0; font-size:11px; padding:3px 10px; background:transparent; color:var(--paper);
+    border:1px solid rgba(255,255,255,.4); border-radius:12px; cursor:pointer;
+    transition:background .15s ease, border-color .15s ease, color .15s ease;
   }
-  .timeline-play-btn:hover{background:var(--paper-dim);}
-  .timeline-play-btn.playing{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .timeline-play-btn:hover, .timeline-speed-btn:hover{background:rgba(255,255,255,.15); border-color:var(--paper);}
+  .timeline-play-btn.playing{background:var(--brass); color:var(--ink); border-color:var(--brass);}
+  .timeline-speed-btn{padding:3px 8px; font-variant-numeric:tabular-nums;}
   .avail-source-label{
     font-size:11px; font-weight:600; color:var(--brass-dark); letter-spacing:.02em;
     padding:8px 2px 3px; border-top:1px dashed var(--rule); margin-top:4px;
@@ -538,29 +684,33 @@
      一般瀏覽模式點擊地圖任意處會在該點放置一枚圖釘 (.identify-pin-marker)，
      只要使用者未主動「清除標記」，圖釘就會持續留在地圖上；點擊圖釘可
      重新開啟／關閉上方的座標資訊卡片 (#identifyPopup)，兩者狀態各自獨立。
-     用 ol.Overlay positioning:'bottom-center' 定位，因此圖釘必須是
-     .identify-pin 容器裡最底部、水平置中的元素，尖角／圖釘尖端才會
-     精準對齊點擊的地圖座標。 */
+     用 ol.Overlay positioning:'center-center' 鎖定紅點中心，彈窗改絕對定位
+     疊加在紅點正上方、脫離文件流，避免彈窗展開/收合時因容器高度變化
+     影響 Overlay 的錨點換算而讓紅點跟著位移。 */
   .identify-pin{
     position:absolute; z-index:10; display:none; text-align:center;
-    flex-direction:column; align-items:center;
   }
-  .identify-pin.show{display:flex;}
+  .identify-pin.show{display:block;}
   .identify-popup{
-    position:relative; text-align:left; width:250px;
+    position:absolute; bottom:calc(100% + 10px); left:50%; transform:translateX(-50%);
+    text-align:left; min-width:310px;
     background:var(--paper); border:1px solid var(--rule); border-radius:4px;
     box-shadow:0 4px 14px rgba(0,0,0,.35);
-    padding:12px 30px 10px 12px; margin-bottom:2px;
+    padding:10px 12px 10px 12px;
     font-family:var(--sans); font-size:12px; color:var(--ink); line-height:1.5;
   }
-  .identify-popup::after{
-    content:""; display:block; width:0; height:0; margin:0 auto;
-    border-left:8px solid transparent; border-right:8px solid transparent;
-    border-top:9px solid var(--paper);
-    filter:drop-shadow(0 2px 2px rgba(0,0,0,.3));
+  .identify-popup-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid var(--rule);
   }
+  .identify-popup-title{font-weight:600; font-size:12.5px; color:var(--ink);}
+  .identify-popup-actions{display:flex; align-items:center; gap:8px;}
+  .identify-popup-clear{
+    background:none; border:none; color:var(--rule); font-family:var(--sans);
+    font-size:11px; text-decoration:underline; cursor:pointer; padding:0;
+  }
+  .identify-popup-clear:hover{color:var(--stamp);}
   .identify-popup-close{
-    position:absolute; top:6px; right:6px; z-index:1;
     width:20px; height:20px; border-radius:50%;
     background:none; border:1px solid var(--rule); color:var(--rule);
     font-size:13px; line-height:1; cursor:pointer;
@@ -575,16 +725,9 @@
     font-family:var(--sans); font-size:12px; cursor:pointer;
   }
   .identify-search-btn:hover{background:var(--brass-dark); border-color:var(--brass-dark);}
-  .identify-clear-btn{
-    display:block; width:100%; margin-top:6px; padding:4px 0;
-    background:none; border:none; color:var(--rule);
-    font-family:var(--sans); font-size:11px; text-align:center;
-    text-decoration:underline; cursor:pointer;
-  }
-  .identify-clear-btn:hover{color:var(--stamp);}
 
   /* 圖釘本體：只要 Pin 存在就永遠可見可點擊，不受彈窗開關影響。
-     用實心圓點表示落點，圓心／底緣對齊 ol.Overlay 錨點座標，
+     用實心圓點表示落點，圓心對齊 ol.Overlay 錨點座標（center-center），
      避免旋轉水滴造型讓視覺尖端偏離實際點擊座標。 */
   .identify-pin-marker{
     width:18px; height:18px; border-radius:50%; padding:0;
@@ -595,7 +738,7 @@
   .identify-pin-marker:hover{transform:scale(1.15);}
 
   @media (max-width:640px){
-    .identify-popup{width:min(250px, 70vw);}
+    .identify-popup{max-width:min(310px, 80vw);}
   }
 
   /* ---------- Swipe compare divider ---------- */
@@ -642,39 +785,54 @@
   select.compare-select-floating:hover,
   select.compare-select-floating:focus{border-color:var(--stamp); outline:none;}
 
-  /* ---------- 時間軸模式：地圖下方浮動列 ---------- */
+  /* ---------- 時間軸模式：地圖下方浮動列 ----------
+     整個面板改成跟 #custom-timeline-dock 一致的深色卡片視覺語言（背景／
+     邊框／圓角／陰影數值直接抄一份），兩者仍各自獨立成一條 CSS 規則、
+     不共用同一個選擇器。比例尺切換膠囊與重新整理按鈕改用 ID 選擇器
+     （#mapTimelineRefreshBtn）疊加深色配色，刻意不直接改
+     .map-timeline-refresh-btn 這個共用 class 本身——它同時也被
+     #multiOverlayBar／自訂圖層清單等其他淺色面板的按鈕共用，改共用
+     class 會連帶把那些面板也染成深色，超出這次的範圍。 */
   #mapTimelineBar{
     position:absolute; left:50%; bottom:16px; z-index:9;
     transform:translateX(-50%);
     width:min(560px, calc(100% - 32px)); /* 固定寬度、置中，兩側留出地圖可視空間；小螢幕才會頂到邊界 */
     display:none;
-    background:var(--paper); border:1px solid var(--rule); border-radius:6px;
-    box-shadow:0 4px 14px rgba(0,0,0,.35);
-    padding:6px 14px 3px;
-    max-height:130px; overflow-y:auto; overflow-x:hidden;
+    background:rgba(23,33,29,.92); backdrop-filter:blur(6px);
+    color:var(--paper); border:1px solid var(--brass); border-radius:12px;
+    box-shadow:0 6px 20px rgba(0,0,0,.4);
+    padding:10px 16px 12px;
+    max-height:220px; overflow-y:auto; overflow-x:hidden;
   }
   #mapTimelineBar.show{display:block;}
-  .map-timeline-bar-inner .avail-empty{margin:4px 2px;}
+  .map-timeline-bar-inner .avail-empty{margin:4px 2px; color:rgba(255,255,255,.75);}
   .map-timeline-bar-head{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
-    padding-bottom:4px; margin-bottom:1px; border-bottom:1px solid var(--paper-dim);
+    padding-bottom:6px; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,.18);
   }
-  .map-timeline-hint{font-size:11px; color:var(--rule); font-weight:600; letter-spacing:.02em;}
   .map-timeline-scale-switch{display:flex; gap:4px;}
   .map-timeline-scale-switch button{
-    font-size:10.5px; padding:3px 8px; background:var(--paper); color:var(--rule);
-    border:1px solid var(--rule); border-radius:10px; cursor:pointer; white-space:nowrap;
+    font-size:10.5px; padding:3px 8px; background:transparent; color:var(--paper);
+    border:1px solid rgba(255,255,255,.4); border-radius:10px; cursor:pointer; white-space:nowrap;
   }
-  .map-timeline-scale-switch button:hover{background:var(--paper-dim);}
-  .map-timeline-scale-switch button.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .map-timeline-scale-switch button:hover{background:rgba(255,255,255,.15); border-color:var(--paper);}
+  .map-timeline-scale-switch button.active{background:var(--brass); color:var(--ink); border-color:var(--brass);}
+  /* .map-timeline-refresh-btn 這個 class 同時也被 #multiOverlayBar／
+     自訂圖層清單等其他淺色面板的按鈕共用（見該 class 原本定義處），
+     這裡只用 ID 選擇器疊加深色配色，不動共用 class 本身。 */
   .map-timeline-refresh-btn{
     font-size:11px; padding:3px 9px; background:var(--paper); color:var(--ink);
     border:1px solid var(--rule); border-radius:12px; cursor:pointer; white-space:nowrap;
     flex-shrink:0;
   }
   .map-timeline-refresh-btn:hover{background:var(--paper-dim);}
+  .map-timeline-hint{font-size:11px; color:var(--rule); font-weight:600; letter-spacing:.02em;}
+  #mapTimelineRefreshBtn{
+    background:transparent; color:var(--paper); border:1px solid rgba(255,255,255,.4);
+  }
+  #mapTimelineRefreshBtn:hover{background:rgba(255,255,255,.15); border-color:var(--paper);}
   /* 地圖已經移動、但使用者還沒按重新整理：按鈕改用醒目色提示 */
-  .map-timeline-refresh-btn.stale{
+  #mapTimelineRefreshBtn.stale{
     background:var(--stamp); color:var(--paper); border-color:var(--stamp);
     animation:timeline-stale-pulse 1.6s ease-in-out infinite;
   }
@@ -728,6 +886,118 @@
   .multi-layer-remove{color:var(--stamp); border-color:var(--stamp);}
   .multi-layer-remove:hover{background:rgba(166,61,47,.1);}
 
+  /* ---------- 搜尋結果面板：自訂時間軸多選模式的懸浮操作列 ----------
+     跟 #mapTimelineBar／#multiOverlayBar 一樣是常駐在 DOM 裡、用 class
+     切換顯示的浮動元件，但這個是固定在整個視窗（不是地圖容器）底部
+     置中，所以用 position:fixed，預設用 opacity+pointer-events 隱藏，
+     不用 display:none，方便未來要加淡入淡出動畫時直接調整 transition。 */
+  .search-batch-bar{
+    position:fixed; left:50%; bottom:20px; z-index:30;
+    transform:translateX(-50%);
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    max-width:min(640px, calc(100% - 32px));
+    background:var(--ink); color:var(--paper);
+    border:1px solid var(--brass); border-radius:20px;
+    box-shadow:0 6px 20px rgba(0,0,0,.4);
+    padding:8px 16px;
+    opacity:0; pointer-events:none;
+    transition:opacity .18s ease, transform .18s ease;
+  }
+  .search-batch-bar.show{opacity:1; pointer-events:auto;}
+  .search-batch-count{font-size:12px; font-weight:600; color:var(--paper); white-space:nowrap;}
+  .search-batch-actions{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .search-batch-btn{
+    font-size:11.5px; padding:5px 11px; background:transparent; color:var(--paper);
+    border:1px solid var(--paper); border-radius:12px; cursor:pointer; white-space:nowrap;
+    transition:background .15s ease, color .15s ease, opacity .15s ease;
+  }
+  .search-batch-btn:hover{background:rgba(255,255,255,.15);}
+  .search-batch-confirm{background:var(--brass); color:var(--ink); border-color:var(--brass); font-weight:600;}
+  .search-batch-confirm:hover{background:var(--brass-dark); color:var(--paper);}
+  .search-batch-confirm:disabled{opacity:.4; cursor:default; background:transparent; color:var(--paper); border-color:var(--rule);}
+
+  /* ---------- 自訂時間軸浮動 dock（features/customTimelineUI.js） ----------
+     跟 .search-batch-bar 一樣是固定在整個視窗底部置中的浮動元件（不是
+     地圖容器內部），深色毛玻璃視覺沿用 #mapTimelineBar 的配色語彙，但
+     class 前綴一律自成一套 custom-timeline-*，不跟既有時間軸/操作列的
+     class 混用，也不共用容器。z-index 刻意比 .search-batch-bar 高一階：
+     confirmCustomTimeline() 會先 exitSelectionMode()（隱藏操作列）才
+     開 dock，時序上不會同時出現，但保守起見仍讓 dock 蓋在上面。 */
+  #custom-timeline-dock{
+    position:fixed; left:50%; bottom:20px; z-index:31;
+    transform:translateX(-50%) translateY(8px);
+    width:min(560px, calc(100% - 32px));
+    background:rgba(23,33,29,.92); backdrop-filter:blur(6px);
+    color:var(--paper); border:1px solid var(--brass); border-radius:12px;
+    box-shadow:0 6px 20px rgba(0,0,0,.4);
+    padding:10px 16px 12px;
+    opacity:0; pointer-events:none;
+    transition:opacity .18s ease, transform .18s ease;
+  }
+  #custom-timeline-dock.show{
+    opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(0);
+  }
+  .custom-timeline-head{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+    padding-bottom:6px; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,.18);
+  }
+  .custom-timeline-head-text{min-width:0; flex:1;}
+  .custom-timeline-title{
+    font-size:13px; font-weight:600; color:var(--paper); line-height:1.35;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .custom-timeline-meta{font-size:11px; color:rgba(255,255,255,.7); margin-top:2px;}
+  .custom-timeline-close{
+    flex-shrink:0; width:22px; height:22px; padding:0; line-height:1;
+    background:transparent; color:var(--paper); border:1px solid rgba(255,255,255,.4);
+    border-radius:50%; cursor:pointer; font-size:11px;
+  }
+  .custom-timeline-close:hover{background:rgba(255,255,255,.15); border-color:var(--paper);}
+
+  .custom-timeline-dots{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:4px;
+    margin-bottom:6px; overflow-x:auto;
+  }
+  .custom-timeline-dot-wrap{
+    display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0;
+    min-width:28px;
+  }
+  .custom-timeline-dot{
+    width:11px; height:11px; padding:0; border-radius:50%;
+    background:rgba(255,255,255,.3); border:1px solid rgba(255,255,255,.5);
+    cursor:pointer;
+  }
+  .custom-timeline-dot:hover{background:rgba(255,255,255,.5);}
+  .custom-timeline-dot.active{background:var(--brass); border-color:var(--brass);}
+  .custom-timeline-dot-label{
+    font-size:10px; color:rgba(255,255,255,.65); white-space:nowrap; cursor:pointer;
+  }
+
+  .custom-timeline-slider-row{margin:2px 0 10px; display:flex; align-items:center; gap:8px;}
+  .custom-timeline-slider{flex:1; min-width:0; accent-color:var(--brass-dark);}
+  .custom-timeline-play-btn{
+    flex-shrink:0; font-size:11px; padding:3px 10px; background:transparent; color:var(--paper);
+    border:1px solid rgba(255,255,255,.4); border-radius:12px; cursor:pointer;
+  }
+  .custom-timeline-play-btn:hover{background:rgba(255,255,255,.15); border-color:var(--paper);}
+  .custom-timeline-play-btn.playing{background:var(--brass); color:var(--ink); border-color:var(--brass);}
+
+  /* 加速播放：1x/2x/0.5x 循環切換鈕，只影響自動播放間隔 */
+  .custom-timeline-speed-btn{
+    flex-shrink:0; font-size:11px; padding:3px 8px; background:transparent; color:var(--paper);
+    border:1px solid rgba(255,255,255,.4); border-radius:12px; cursor:pointer;
+    font-variant-numeric:tabular-nums;
+  }
+  .custom-timeline-speed-btn:hover{background:rgba(255,255,255,.15); border-color:var(--paper);}
+
+  .custom-timeline-opacity-row{display:flex; align-items:center; gap:8px;}
+  .custom-timeline-opacity-label{font-size:11px; color:rgba(255,255,255,.7); flex-shrink:0;}
+  .custom-timeline-opacity-slider{flex:1; min-width:0; accent-color:var(--brass-dark);}
+  .custom-timeline-opacity-value{
+    font-family:var(--serif); font-size:11.5px; color:var(--paper);
+    width:34px; text-align:right; flex-shrink:0;
+  }
+
   /* 圖層選擇器：按鈕 + 手風琴浮動面板 */
   .layer-picker{position:relative;}
   .layer-picker-btn{
@@ -760,23 +1030,29 @@
      一起貼齊側邊欄可視範圍最上方，收合掉不想看的來源後，
      不用捲很長就能找到剩下的來源。 */
   .country-filter{
-    position:sticky; top:var(--sticky-offset, 0px); z-index:4;
-    background:var(--paper); margin:0 0 10px; box-shadow:0 4px 6px -6px rgba(0,0,0,.18);
+    /* 注意：這裡刻意用 --opacity-block-height（只有 .opacity-block 自己的
+       高度），不是 --sticky-offset（.opacity-block + .country-filter 兩者
+       加總，給 .source-head/.category-head 的 scroll-margin-top 用）。
+       如果誤用 --sticky-offset，會把自己的高度也算進自己的 sticky top，
+       導致跟 .opacity-block 之間永遠留一道等於自己高度的縫（不是快速捲動
+       才出現的偶發問題，是每次都會發生的固定錯位），下面捲上來的清單
+       內容就會從這道縫「穿過」吸附列，這正是這條規則要修的 bug。 */
+    position:sticky; top:var(--opacity-block-height, 0px); z-index:4;
+    background:var(--paper); margin:0 0 10px;
+    /* 第二個 box-shadow 是向上延伸 14px 的實色「布幕」，補強跟上方
+       .opacity-block（目前圖層）之間的接縫，跟 .opacity-block 那顆
+       downward 布幕互相重疊覆蓋，即使兩個獨立 sticky 元素其中一個晚了
+       一影格更新，接縫處還是有另一邊的實色布幕擋著，不會露出下面捲上來
+       的來源清單內容。改用 box-shadow（原本是額外的 ::before 偽元素）
+       是因為 box-shadow 跟元素本體共用同一次繪製，不會有獨立圖層各自
+       重繪的時間差；14px 在非吸附狀態（自然排版位置）量測過跟上一個
+       區塊（底圖切換鈕）之間還有 ~18px 空隙，不會蓋到真正的內容。 */
+    box-shadow:0 4px 6px -6px rgba(0,0,0,.18), 0 -14px 0 0 var(--paper);
     /* 跟 .opacity-block 同樣強制獨立合成層，避免快速捲動／手機彈性回彈時
        這條吸附列來不及跟上捲動位移，短暫露出下方被捲上來的來源清單內容。 */
     transform:translateZ(0);
     -webkit-transform:translateZ(0);
     will-change:transform;
-  }
-  /* 向上延伸與吸附列相同底色的遮罩，補滿吸附瞬間／回彈時上方（跟前一個
-     吸附區塊接縫處）可能露出的空白，避免清單內容從縫隙「穿過」吸附列。 */
-  .country-filter::before{
-    content:"";
-    position:absolute;
-    left:-1px; right:-1px; top:-10px;
-    height:10px;
-    background:var(--paper);
-    z-index:1;
   }
   .country-filter button{padding:6px 2px; font-size:11px;}
   .source-group.country-hidden{display:none;}
@@ -883,3 +1159,817 @@
   .wmts-layer-row input[type=checkbox]{accent-color:var(--brass-dark); flex-shrink:0;}
   .wmts-layer-title{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .wmts-add-selected-btn{margin-top:8px; width:100%;}
+
+  /* ---------- 側邊欄可摺疊區塊（src/sidebarUI.js 的 initCollapsibleSections()） ----------
+     視覺語彙比照 .source-head／.category-head 手風琴標題列（淡底色方塊、
+     chevron 指示展開方向），但獨立成一組 class，因為這裡包的是整個功能
+     區塊（模式切換、圖資、目前圖層…）而不是圖層清單節點，語意上分開。 */
+  .side-section{margin-bottom:14px;}
+  /* 不能用 :last-child 讓「最後一塊」少掉這段間距——#layersSection 雖然
+     是側邊欄視覺上中間的區塊，但因為外面包了 #overlayPanel（模式切換用
+     的顯示/隱藏包裝 div），DOM 結構上反而是它自己父層裡唯一的子元素，
+     :last-child 選到的其實是它，導致「圖資」跟下面「收藏」之間的間距
+     被歸零，跟其他區塊間距不一致。統一每塊都固定 14px，不看 DOM 位置。 */
+  .side-section-head{
+    width:100%; text-align:left; background:var(--paper-dim); border:1px solid var(--rule);
+    padding:9px 10px; cursor:pointer; border-radius:2px;
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:var(--sans); font-weight:700; font-size:12.5px; color:var(--ink);
+  }
+  .side-section-head:hover{background:var(--paper);}
+  .side-section-head::after{
+    content:"▸"; font-size:10px; color:var(--rule); margin-left:8px;
+    transition:transform .15s ease;
+  }
+  .side-section.open > .side-section-head::after{transform:rotate(90deg);}
+  .side-section-body{padding-top:8px;}
+  .side-section:not(.open) .side-section-body{display:none;}
+  /* #opacityBlock 本身仍維持吸附行為（見上方 .opacity-block 規則），這裡
+     只補摺疊標題／內容的間距，不動吸附相關屬性。 */
+  #opacityBlock.side-section .side-section-head{background:var(--paper); border:none; padding:0 0 8px; margin-bottom:0;}
+  #opacityBlock.side-section .side-section-head:hover{background:var(--paper);}
+  #opacityBlock.side-section .side-section-body{padding-top:0;}
+
+  /* ---------- 目前圖層（#opacityBlock 內） ---------- */
+  .current-layer-row{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    margin-bottom:10px;
+  }
+  .current-layer-name{
+    font-family:var(--serif); font-size:12.5px; color:var(--ink); line-height:1.4;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;
+  }
+  .current-layer-fav-btn{
+    flex-shrink:0; width:24px; height:24px; padding:0; line-height:1;
+    background:var(--paper); border:1px solid var(--rule); border-radius:50%;
+    font-size:14px; color:var(--rule); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .current-layer-fav-btn:hover{border-color:var(--brass-dark); color:var(--brass-dark);}
+  .current-layer-fav-btn.active{border-color:var(--brass-dark); color:var(--brass-dark); background:rgba(181,140,74,.14);}
+
+  /* ---------- 圖資搜尋（src/ui/layerSearch.js） ----------
+     比照地址搜尋建議清單（.address-suggest）改成「浮動下拉卡片」：
+     position:absolute 疊在 #layerSearchInput 正下方，不再推開下面
+     #modeSection 等側邊欄內容，結果超過清單可視高度時卡片內部捲動
+     （.layer-search-list 的 max-height/overflow-y）。錨定用的
+     position:relative 由 .layer-search-block 同時具備的 .search-block
+     class 提供（見上方 .search-block 定義），這裡不用再另外補。
+     z-index 對齊 .address-suggest（同為 15），避免疊圖時被地圖蓋住，
+     兩邊仍是完全獨立的 DOM／狀態，不共用任何節點。 */
+  .layer-search-panel{
+    position:absolute; left:0; right:0; top:calc(100% + 2px); z-index:15;
+    background:var(--paper); border:1px solid var(--rule); border-radius:2px;
+    box-shadow:0 8px 20px rgba(0,0,0,.3);
+    padding:8px 8px 6px;
+  }
+  .layer-search-panel-head{
+    display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;
+  }
+  .layer-search-count{font-size:11.5px; color:var(--rule); font-weight:600;}
+  .layer-search-collapse-btn{
+    flex-shrink:0; width:22px; height:22px; padding:0; line-height:1;
+    background:none; border:1px solid var(--rule); border-radius:2px;
+    font-size:10px; color:var(--rule); cursor:pointer;
+  }
+  .layer-search-collapse-btn:hover{border-color:var(--brass-dark); color:var(--brass-dark);}
+  .layer-search-panel.collapsed .layer-search-list{display:none;}
+  .layer-search-list{
+    display:flex; flex-direction:column; gap:5px;
+    max-height:360px; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  .layer-search-item{
+    padding:7px 9px; border:1px solid var(--rule); border-radius:3px;
+    background:var(--paper); cursor:pointer;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .layer-search-item:hover{background:var(--paper-dim); border-color:var(--brass-dark);}
+  .layer-search-item-title{font-size:12.5px; color:var(--ink); line-height:1.35;}
+  .layer-search-item-meta{font-size:11px; color:var(--rule); margin-top:2px;}
+  .layer-search-empty{font-size:12px; color:var(--rule); padding:6px 2px; line-height:1.6;}
+  /* 結果超過 200 筆的安全提示（見 src/ui/layerSearch.js 的
+     RESULT_WARN_THRESHOLD），一律全部渲染、只加這行文字提醒縮小範圍。 */
+  .layer-search-list-notice{font-size:11px; color:var(--brass-dark); padding:4px 2px 6px; line-height:1.5;}
+
+  /* ---------- 收藏／最近使用清單（src/sidebarUI.js） ----------
+     項目格式比照 .layer-search-item（標題＋meta），收藏清單多一個
+     移除鈕（沿用 .current-layer-fav-btn 的星號視覺）。 */
+  .favorites-list, .recent-list{
+    display:flex; flex-direction:column; gap:5px;
+    max-height:280px; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  .favorites-empty, .recent-empty{font-size:12px; color:var(--rule); padding:4px 2px; line-height:1.6;}
+  .favorites-item, .recent-item{
+    display:flex; align-items:center; gap:8px;
+    padding:7px 9px; border:1px solid var(--rule); border-radius:3px;
+    background:var(--paper); cursor:pointer;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .favorites-item:hover, .recent-item:hover{background:var(--paper-dim); border-color:var(--brass-dark);}
+  .favorites-item-info, .recent-item-info{flex:1; min-width:0;}
+  .favorites-item-title, .recent-item-title{
+    font-size:12.5px; color:var(--ink); line-height:1.35;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .favorites-item-meta, .recent-item-meta{font-size:11px; color:var(--rule); margin-top:2px;}
+  .favorites-item-remove{
+    flex-shrink:0; width:22px; height:22px; padding:0; line-height:1;
+    background:var(--paper); border:1px solid var(--brass-dark); border-radius:50%;
+    font-size:13px; color:var(--brass-dark); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .favorites-item-remove:hover{background:rgba(181,140,74,.14);}
+
+  /* .recent-section 不是可摺疊區塊（不用 .side-section），永遠展開，
+     視覺上維持跟 .side-section-head 一致的標題列外觀，只是不能點擊摺疊。 */
+  .recent-section{margin-bottom:0;}
+  .recent-section-head{
+    background:var(--paper-dim); border:1px solid var(--rule);
+    padding:9px 10px; border-radius:2px 2px 0 0; border-bottom:none;
+    font-family:var(--sans); font-weight:700; font-size:12.5px; color:var(--ink);
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .recent-clear-btn{
+    font-family:var(--sans); font-weight:400; font-size:11px; color:var(--brass-dark);
+    background:none; border:none; padding:2px 4px; cursor:pointer; text-decoration:underline;
+  }
+  .recent-clear-btn:hover{color:var(--stamp);}
+  .recent-section .recent-list{
+    border:1px solid var(--rule); border-top:none; border-radius:0 0 2px 2px;
+    padding:8px; margin:0;
+  }
+  .recent-section .recent-list:empty{padding:0;}
+
+  @media (max-width:640px){
+    .layer-search-list{max-height:44vh;}
+    .favorites-list, .recent-list{max-height:34vh;}
+  }
+
+  /* ---------- 新手導覽／使用指南（src/ui/onboarding.js） ----------
+     獨立疊加層，不共用側邊欄既有摺疊語彙的 class（避免跟 initCollapsibleSections()
+     的選擇器互相誤觸），只借用同一套顏色變數維持視覺一致。 */
+  .tour-btn-row{display:flex; gap:8px; margin-top:12px;}
+  .tour-btn-row-btn{
+    flex:1; padding:8px 4px; background:var(--paper); border:1px solid var(--rule);
+    border-radius:2px; font-family:var(--sans); font-size:12px; font-weight:600;
+    color:var(--ink); cursor:pointer; text-align:center;
+  }
+  .tour-btn-row-btn:hover{background:var(--paper-dim); border-color:var(--brass-dark); color:var(--brass-dark);}
+
+  /* -- Welcome Modal -- */
+  .onboarding-modal-overlay{
+    position:fixed; inset:0; background:rgba(15,15,10,.55);
+    display:flex; align-items:center; justify-content:center;
+    z-index:120; padding:16px;
+  }
+  .onboarding-modal-card{
+    width:100%; max-width:400px; background:var(--paper); border:1px solid var(--rule);
+    border-radius:4px; box-shadow:0 12px 32px rgba(0,0,0,.4); padding:22px 22px 18px;
+  }
+  .onboarding-modal-title{
+    font-family:var(--serif); font-weight:700; font-size:18px; color:var(--ink);
+    margin:0 0 12px; line-height:1.4;
+  }
+  .onboarding-modal-list{
+    margin:0 0 16px; padding-left:20px; font-size:13px; color:var(--ink); line-height:1.7;
+  }
+  .onboarding-modal-list li{margin-bottom:4px;}
+  .onboarding-modal-actions{display:flex; flex-direction:column; gap:8px;}
+  .onboarding-modal-btn{
+    width:100%; padding:10px 12px; border-radius:2px; font-family:var(--sans);
+    font-size:13px; font-weight:700; cursor:pointer; border:1px solid var(--rule);
+  }
+  .onboarding-modal-btn.primary{background:var(--brass-dark); border-color:var(--brass-dark); color:var(--paper);}
+  .onboarding-modal-btn.primary:hover{background:var(--ink); border-color:var(--ink);}
+  .onboarding-modal-btn.secondary{background:var(--paper); color:var(--ink);}
+  .onboarding-modal-btn.secondary:hover{background:var(--paper-dim); border-color:var(--brass-dark);}
+  .onboarding-modal-btn.text{
+    border:none; background:none; color:var(--rule); font-weight:400; text-decoration:underline;
+    padding:4px 12px;
+  }
+  .onboarding-modal-btn.text:hover{color:var(--stamp);}
+
+  /* -- 5 步聚光燈導覽 -- */
+  .tour-highlight{
+    position:fixed; z-index:130; border:2px solid var(--brass-dark); border-radius:4px;
+    box-shadow:0 0 0 9999px rgba(15,15,10,.62);
+    pointer-events:none; transition:top .2s ease, left .2s ease, width .2s ease, height .2s ease;
+  }
+  .tour-tooltip{
+    position:fixed; z-index:131; width:280px; max-width:calc(100vw - 32px);
+    background:var(--paper); border:1px solid var(--rule); border-radius:4px;
+    box-shadow:0 8px 24px rgba(0,0,0,.35); padding:14px 16px;
+    transition:top .2s ease, left .2s ease;
+  }
+  .tour-tooltip-step{font-size:11px; color:var(--rule); font-weight:600; letter-spacing:.02em;}
+  .tour-tooltip-title{
+    font-family:var(--serif); font-weight:700; font-size:15px; color:var(--ink);
+    margin:4px 0 6px; line-height:1.35;
+  }
+  .tour-tooltip-desc{font-size:12.5px; color:var(--ink); line-height:1.55; margin:0;}
+  .tour-tooltip-extra{
+    margin:8px 0 0; font-size:12px; color:var(--brass-dark); font-weight:700; line-height:1.5;
+  }
+  .tour-tooltip-actions{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:12px;}
+  .tour-tooltip-actions-right{display:flex; gap:6px;}
+  .tour-btn-skip{
+    background:none; border:none; color:var(--rule); font-family:var(--sans); font-size:11.5px;
+    text-decoration:underline; cursor:pointer; padding:4px 2px;
+  }
+  .tour-btn-skip:hover{color:var(--stamp);}
+  .tour-btn-prev, .tour-btn-next{
+    font-family:var(--sans); font-size:12px; font-weight:700; border-radius:2px;
+    padding:7px 12px; cursor:pointer;
+  }
+  .tour-btn-prev{background:var(--paper); border:1px solid var(--rule); color:var(--ink);}
+  .tour-btn-prev:hover{background:var(--paper-dim); border-color:var(--brass-dark);}
+  .tour-btn-next{background:var(--brass-dark); border:1px solid var(--brass-dark); color:var(--paper);}
+  .tour-btn-next:hover{background:var(--ink); border-color:var(--ink);}
+
+  /* -- 使用指南抽屜 -- */
+  .guide-drawer-overlay{
+    position:fixed; inset:0; background:rgba(15,15,10,.45); z-index:120;
+  }
+  .guide-drawer{
+    position:fixed; top:0; right:0; bottom:0; width:380px; max-width:92vw;
+    background:var(--paper); box-shadow:-8px 0 24px rgba(0,0,0,.35);
+    z-index:121; display:flex; flex-direction:column; overflow:hidden;
+  }
+  .guide-drawer-header{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:16px 18px; border-bottom:1px solid var(--rule); flex-shrink:0;
+  }
+  .guide-drawer-title{font-family:var(--serif); font-weight:700; font-size:17px; color:var(--ink); margin:0;}
+  .guide-drawer-close{
+    flex-shrink:0; width:28px; height:28px; padding:0; background:none;
+    border:1px solid var(--rule); border-radius:2px; color:var(--ink); font-size:14px; cursor:pointer;
+  }
+  .guide-drawer-close:hover{background:var(--paper-dim); border-color:var(--brass-dark);}
+  .guide-drawer-body{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px 18px 24px;}
+  .guide-acc-item{border-bottom:1px dashed var(--paper-dim);}
+  .guide-acc-item:last-child{border-bottom:none;}
+  .guide-acc-head{
+    width:100%; text-align:left; background:none; border:none; padding:12px 2px;
+    cursor:pointer; display:flex; justify-content:space-between; align-items:center;
+    font-family:var(--sans); font-weight:700; font-size:13px; color:var(--ink);
+  }
+  .guide-acc-head::after{
+    content:"▸"; font-size:10px; color:var(--rule); margin-left:8px; transition:transform .15s ease;
+  }
+  .guide-acc-item.open .guide-acc-head::after{transform:rotate(90deg);}
+  .guide-acc-body{
+    display:none; padding:0 2px 14px; font-size:12.5px; color:var(--ink); line-height:1.65;
+  }
+  .guide-acc-item.open .guide-acc-body{display:block;}
+
+  @media (max-width:640px){
+    .tour-tooltip{width:calc(100vw - 32px);}
+    .guide-drawer{width:100vw; max-width:100vw;}
+    .onboarding-modal-card{padding:18px 16px 14px;}
+  }
+
+  /* ---------- 圖例預覽 Modal（src/uiTree.js buildLayerItem） ----------
+     桌機／手機共用同一份 DOM 與邏輯，僅靠 <=768px 覆寫規則改成全螢幕。
+     z-index 刻意設得比 5 步聚光燈導覽（.tour-tooltip 的 131）更高，
+     確保無論在哪個模式、Bottom Sheet 展開與否都一定蓋在最上層。 */
+  .legend-modal-overlay{
+    position:fixed; inset:0; background:rgba(15,15,10,.6);
+    display:flex; align-items:center; justify-content:center;
+    z-index:200; padding:24px;
+  }
+  .legend-modal-card{
+    position:relative; max-width:520px; width:100%; max-height:80vh;
+    background:var(--paper); border:1px solid var(--rule); border-radius:4px;
+    box-shadow:0 12px 32px rgba(0,0,0,.4); padding:36px 16px 16px; overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  .legend-modal-close{
+    position:absolute; top:8px; right:8px; width:28px; height:28px; padding:0;
+    background:var(--paper); border:1px solid var(--rule); border-radius:2px;
+    color:var(--ink); font-size:14px; cursor:pointer;
+  }
+  .legend-modal-close:hover{background:var(--paper-dim); border-color:var(--brass-dark);}
+  .legend-modal-body{flex:1; overflow:auto; display:flex; align-items:center; justify-content:center;}
+  .legend-modal-img{max-width:100%; max-height:70vh; display:block;}
+  .legend-modal-error{font-size:13px; color:var(--ink); text-align:center; margin:0;}
+
+  /* =========================
+     Mobile Responsive Layout
+     =========================
+     只在 <=768px 生效（平板 769~1024px 維持桌面版互動，不套用這裡任何
+     規則）。所有覆寫都靠「同 specificity、後宣告」贏過前面桌面規則
+     （見各規則上方註解），刻意不用 !important、不改動前面任何既有規則，
+     確保 >768px 的桌面／平板外觀與操作完全不受影響。
+
+     新增的手機專屬 DOM（#mobileSearchBar／.sheet-handle／#mobileModeBtn／
+     #mobileModePopover／.floating-layer-name）預設一律隱藏在這裡，
+     只有下面 @media (max-width:768px) 裡才會顯示，>768px 永遠是空殼。
+     這些元件本身不包含任何搜尋／模式切換／圖層邏輯：
+       - #mobileSearchBar 由 src/ui/mobileLayout.js 把桌面版
+         .search-row／#addressSuggest 這兩個「真正的」DOM 節點搬進來
+         （不是複製），事件監聽器原封不動，同一套 features/search.js。
+       - #mobileModeBtn／#mobileModePopover 點擊只是轉呼叫 #modeSwitch
+         裡對應按鈕的 .click()，核心切換邏輯仍在 core/modeManager.js。
+  ------------------------------------------------------------- */
+  #mobileSearchBar{display:none;}
+  .sheet-handle{display:none;}
+  #mobileModeBtn{display:none;}
+  #mobileModePopover{display:none;}
+  .floating-layer-name{display:none;}
+  .floating-layer-fav-btn{display:none;}
+  .floating-clear-btn{display:none;}
+  /* 地址／圖資搜尋合併切換鈕：只在手機版有意義（見下方 @media），桌面版
+     兩個 .search-block 各自獨立顯示、不需要切換，一律隱藏。 */
+  .mobile-search-mode-btn{display:none;}
+
+  /* 手機版「台灣」分頁三段式瀏覽（src/ui/mobileTwBrowse.js）：桌機／
+     平板一律隱藏，只在下方 @media (max-width:768px) 且 sidebarUI.js 的
+     syncMobileTwView() 判定該顯示時才會現身。
+     注意：這裡刻意用 class 選擇器而不是 #mobileTwBrowse 這種 ID 選擇器
+     ——sidebarUI.js 用原生 hidden attribute（[hidden]{display:none} 是
+     瀏覽器內建規則，specificity 很低）控制顯示與否，如果這裡用 ID
+     選擇器寫 display:flex，specificity 會蓋過 [hidden]，導致 hidden
+     怎麼設都藏不住（CLAUDE.md 已記錄過同類陷阱）。 */
+  .mobile-tw-browse{display:none;}
+
+  @media (max-width:768px){
+    :root{
+      --mobile-topbar-h:52px;
+      --mobile-sheet-peek:60px;
+      /* 手機瀏覽器的網址列／工具列會動態顯示收起，純 CSS vh 是以
+         「工具列收起後」的最大視窗換算，跟當下實際可視高度對不上，
+         會讓 Sheet 實際佔用高度比算出來的短一截、下方浮動列因此露出來
+         蓋住畫面（見 src/ui/mobileLayout.js 的 updateViewportMetrics()）。
+         --vvh 由 JS 即時量測 window.visualViewport.height 寫入，這裡
+         優先用它算 px，JS 還沒跑到之前才退回 svh（小可視高度，比一般
+         vh 更接近工具列展開時的實際高度）當保險。 */
+      --mobile-sheet-half:calc(var(--vvh, 100svh) * 0.45);
+      --mobile-sheet-full:calc(var(--vvh, 100svh) * 0.75);
+    }
+
+    /* ---------- 頂部固定搜尋列 ---------- */
+    #mobileSearchBar{
+      display:block;
+      position:fixed; left:50%; top:calc(env(safe-area-inset-top) + 10px);
+      transform:translateX(-50%);
+      width:90%; max-width:520px; z-index:40;
+      /* 15 秒閒置自動摺疊成圓鈕（見 src/ui/mobileLayout.js 的
+         initSearchBarAutoCollapse()）：摺疊後改錨定右上角（見下方
+         .mobile-search-collapsed），跟這裡「置中」用的是同一組
+         left/transform 屬性，只是數值不同，兩者才能被 transition
+         平滑插值，不會因為切換定位方式（例如 left⇄right）而瞬間跳位。 */
+      transition:width .32s cubic-bezier(.4,0,.2,1),
+                 left .32s cubic-bezier(.4,0,.2,1),
+                 transform .32s cubic-bezier(.4,0,.2,1);
+    }
+    /* 摺疊狀態：改貼右上角（比照其餘手機浮動控制項都是貼邊角，不會浮在
+       畫面正中央），寬度與圓角一併收到跟 #addressSearchBtn 本體一樣大，
+       避免摺疊後仍殘留一圈長條留白（實機回報「仍會有突出空間」）。 */
+    #mobileSearchBar.mobile-search-collapsed{
+      left:calc(100% - 44px - 10px - env(safe-area-inset-right));
+      transform:translateX(0);
+      width:44px; max-width:44px;
+    }
+    #mobileSearchBar .search-row{
+      background:var(--paper); border:1px solid var(--rule); border-radius:22px;
+      padding:5px 6px; box-shadow:0 4px 16px rgba(0,0,0,.32); gap:5px;
+      overflow:hidden; justify-content:center; align-items:center;
+      transition:padding .32s cubic-bezier(.4,0,.2,1), gap .32s cubic-bezier(.4,0,.2,1),
+                 box-shadow .32s cubic-bezier(.4,0,.2,1), background .32s cubic-bezier(.4,0,.2,1),
+                 border-color .32s cubic-bezier(.4,0,.2,1);
+    }
+    #mobileSearchBar .address-input{
+      border:none; background:transparent; border-radius:0;
+      font-size:14px; padding:9px 8px; min-height:24px;
+      flex:1 1 auto; min-width:0; opacity:1;
+      /* 摺疊時靠 flex-basis/width/opacity 一起淡出＋收合寬度，展開時
+         反向播放同一組 transition，避免內容瞬間消失顯得生硬。 */
+      transition:flex-basis .32s cubic-bezier(.4,0,.2,1), width .32s cubic-bezier(.4,0,.2,1),
+                 opacity .2s ease, margin .32s cubic-bezier(.4,0,.2,1), padding .32s cubic-bezier(.4,0,.2,1);
+    }
+    #mobileSearchBar .address-input:focus{outline:none; border-color:transparent;}
+    #mobileSearchBar .address-search-btn{
+      width:40px; height:40px; border-radius:50%; flex-shrink:0;
+      transition:transform .32s cubic-bezier(.4,0,.2,1);
+    }
+    #mobileSearchBar #locateSearchBtn{
+      /* 定位鈕跟輸入框一起淡出/收合，只留放大鏡圓鈕代表整條搜尋列 */
+      transition:flex-basis .32s cubic-bezier(.4,0,.2,1), width .32s cubic-bezier(.4,0,.2,1),
+                 opacity .2s ease, margin .32s cubic-bezier(.4,0,.2,1);
+    }
+    #mobileSearchBar.mobile-search-collapsed .search-row{
+      width:44px; height:44px; padding:0; gap:0;
+      border-color:transparent; background:transparent; box-shadow:none;
+    }
+    #mobileSearchBar.mobile-search-collapsed .address-input,
+    #mobileSearchBar.mobile-search-collapsed #locateSearchBtn,
+    #mobileSearchBar.mobile-search-collapsed #mobileSearchModeBtn,
+    #mobileSearchBar.mobile-search-collapsed #layerSearchClearBtn{
+      flex:0 0 0; width:0; min-width:0; opacity:0; margin:0; padding:0;
+      border:none; pointer-events:none; overflow:hidden;
+    }
+    /* 圖資模式收合時的例外：地址模式收合後會留下 #addressSearchBtn
+       （放大鏡）當作視覺錨點，但 #addressSearchBtn 不在圖資搜尋列裡；
+       圖資搜尋列（.layer-search-row）僅有的三個子節點（輸入框／模式
+       切換鈕／清除鈕）都被上面那條通用規則收合隱藏，導致收合圓圈裡
+       完全沒有圖示可看（見 relocateModeToggleBtn()，圖資模式下
+       #mobileSearchModeBtn 會被搬進 .layer-search-row）。這裡借用
+       #mobileSearchModeBtn 本身當作圖資模式的收合錨點，逐一還原被
+       上面那條規則歸零的屬性，讓圓圈裡留一顆清楚可辨識的 📍/🗺 圖示
+       （點擊整個圓圈展開搜尋列的既有邏輯不受影響）。用 body class 疊
+       specificity 蓋過通用隱藏規則，不需要動到規則的原本順序。 */
+    body.mobile-search-mode-layer #mobileSearchBar.mobile-search-collapsed #mobileSearchModeBtn{
+      flex:0 0 36px; width:36px; height:36px; min-width:36px;
+      opacity:1; margin:0; padding:0; border:1px solid var(--ink);
+      pointer-events:auto; overflow:visible;
+    }
+    #mobileSearchBar .address-suggest{
+      position:absolute; top:calc(100% + 6px); left:0; right:0;
+      border-radius:12px; max-height:min(360px, 55vh);
+    }
+
+    /* ---------- 地址／圖資搜尋合併成一個輸入框 ----------
+       兩個 .search-row（.address-search-row／.layer-search-row）都會被
+       src/ui/mobileLayout.js 搬進 #mobileSearchBar（見 relocateSearchBar()／
+       relocateLayerSearchRow()），這裡只依 body class 決定同一時間只顯示
+       其中一條，讓使用者看起來像單一個輸入框＋切換鈕，實際上兩邊各自
+       仍是獨立的真實 DOM 節點與事件監聽器，互不接管對方的搜尋邏輯。
+       body class（mobile-search-mode-address／mobile-search-mode-layer）
+       由 applyMobileSearchMode() 同步，預設（尚未套用 class 時）顯示
+       地址列，跟目前手機版既有行為一致。 ---------- */
+    #mobileSearchBar .mobile-search-mode-btn{
+      display:flex; align-items:center; justify-content:center;
+      width:36px; height:36px; border-radius:50%; flex-shrink:0;
+      font-size:15px; padding:0;
+      transition:flex-basis .32s cubic-bezier(.4,0,.2,1), width .32s cubic-bezier(.4,0,.2,1),
+                 opacity .2s ease, margin .32s cubic-bezier(.4,0,.2,1);
+    }
+    #mobileSearchBar .layer-search-row{display:none;}
+    body.mobile-search-mode-layer #mobileSearchBar .address-search-row{display:none;}
+    body.mobile-search-mode-layer #mobileSearchBar .layer-search-row{display:flex;}
+    /* 切到圖資模式時，地址建議清單（若剛好還開著）一併隱藏，只是視覺
+       蓋掉，不呼叫 hideSuggest()，內容與 .show class 都原封不動保留，
+       切回地點模式馬上恢復顯示。 */
+    body.mobile-search-mode-layer #mobileSearchBar .address-suggest{display:none;}
+
+    /* 非啟用中的搜尋整塊（含各自結果面板 #locationResult／
+       #layerSearchPanel）在手機版隱藏，只用 CSS class 隱藏、不清除任何
+       搜尋狀態，切回來時先前的搜尋結果原封不動還在，不用重新搜。 */
+    body.mobile-search-mode-layer .search-block:not(.layer-search-block){display:none;}
+    body.mobile-search-mode-address .layer-search-block{display:none;}
+
+    /* ---------- 浮動地圖控制項 ----------
+       定位按鈕、繪圖工具開關兩顆常駐浮動鈕在手機版收起來：定位保留在
+       搜尋列裡的「用目前位置搜尋圖資」按鈕（#locateSearchBtn，已經在
+       #mobileSearchBar 裡）；繪圖工具開關改移進「地圖工具」浮動選單
+       （#mobileDrawToggle，見 index.html／src/ui/mobileLayout.js），
+       預設不開啟，跟桌面版一樣，只是入口換位置。放大縮小按鈕也收起來，
+       手機直接用雙指縮放即可（見使用者回報）。 ---------- */
+    .locate-btn, .draw-toggle-btn, .ol-zoom{
+      display:none;
+    }
+    .draw-toolbar{
+      top:calc(env(safe-area-inset-top) + var(--mobile-topbar-h) + 10px);
+      right:calc(10px + env(safe-area-inset-right));
+      max-height:min(420px, 58vh); overflow-y:auto; -webkit-overflow-scrolling:touch;
+    }
+    .draw-tool-btn{padding:9px 4px; min-height:44px;}
+    .draw-color-swatch, .draw-color-custom{width:26px; height:26px;}
+
+    .locate-toast{top:calc(env(safe-area-inset-top) + var(--mobile-topbar-h) + 10px); right:10px;}
+
+    /* ---------- 日期印章：縮小並疊到左右比對浮動選單（#compareWrapB）
+       正上方，維持跟桌面版一樣在右下角，但避開同一欄的其他控制項。 ---------- */
+    #stamp{
+      width:64px; height:64px;
+      right:calc(8px + env(safe-area-inset-right));
+      bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 56px);
+    }
+    #stamp .stamp-year{font-size:15px;}
+    #stamp .stamp-label{font-size:7px; max-width:52px;}
+
+    /* 側邊欄「📌 目前圖層」欄位在手機版整條隱藏：收藏／清除疊圖／透明度
+       這三項功能都已併入下方「目前圖層」浮動列（.floating-opacity），
+       避免同一份資訊在 Bottom Sheet 與浮動列重複出現兩次。
+       必須用 !important：src/core/modeManager.js 切換疊圖／時間軸模式時
+       會對這顆節點寫入 inline style（opacityBlockEl.style.display=
+       'block'/'none'），inline style 的優先權高於一般 CSS 規則（不論
+       selector specificity），只有 !important 才蓋得過去，比照同檔案
+       .floating-opacity／[hidden] 已經在用的手法。 */
+    #opacityBlock{display:none !important;}
+
+    /* ---------- 手機「目前圖層」浮動列：取代桌面版左下角浮動透明度，
+       改成貼齊底部工作表 peek 區上緣的橫幅，預設只顯示一行「圖名＋
+       收藏星號＋清除鈕＋百分比」，點一下展開透明度拉桿。存在歷史圖層時
+       才顯示（.has-layer，由 src/sidebarUI.js 的 renderCurrentLayer()
+       同步）。收藏／清除疊圖兩顆按鈕是桌面版 #opacityBlock 裡
+       #currentLayerFavBtn／#clearBtn 在手機版的唯一入口（桌面版整欄
+       隱藏，見上方 #opacityBlock{display:none;}），事件監聽器另見
+       src/sidebarUI.js（收藏）／src/core/layerManager.js（清除疊圖）。 ---------- */
+    .floating-opacity{
+      display:none !important; /* 預設不顯示，由 .show.has-layer 覆寫 */
+      /* 左邊留給「地圖工具」快速選單按鈕（#mobileModeBtn，左下角）的欄位，
+         展開狀態（含透明度拉桿）高度會長高，避免疊到按鈕上蓋住文字。 */
+      left:calc(68px + env(safe-area-inset-left));
+      right:calc(8px + env(safe-area-inset-right));
+      bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 8px);
+      width:auto; min-width:0; max-width:none;
+      flex-wrap:wrap; row-gap:8px;
+      border-radius:14px; padding:10px 14px;
+      z-index:22;
+    }
+    .floating-opacity.show.has-layer{display:flex !important;}
+    .floating-layer-name{
+      display:block; order:1; flex:1 1 auto; min-width:0;
+      font-family:var(--serif); font-size:13px; color:var(--ink);
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    /* 收藏／清除疊圖：沿用桌面版 .current-layer-fav-btn 圓形按鈕樣式
+       （顏色／hover/active 邏輯不重寫），這裡只縮小尺寸塞進同一行橫幅。 */
+    .floating-layer-fav-btn,
+    .floating-clear-btn{
+      display:flex; flex-shrink:0;
+      width:24px; height:24px; font-size:12px;
+    }
+    .floating-layer-fav-btn{order:2;}
+    .floating-clear-btn{order:3;}
+    .floating-opacity .opacity-val{order:4;}
+    .floating-opacity .field-label{order:5; flex-basis:100%; display:none; margin:2px 0 0;}
+    .floating-opacity input[type=range]{order:6; flex-basis:100%; display:none; height:32px;}
+    /* 展開狀態（點一下橫幅）：補顯示「透明度」標籤與拉桿，卡片高度自然撐開 */
+    .floating-opacity.expanded .field-label,
+    .floating-opacity.expanded input[type=range]{display:block;}
+
+    /* ---------- 手機「地圖工具」快速模式選單 ---------- */
+    /* 放左下角（不是右下角）：右下角已經有縮放／日期印章／左右比對 B 側
+       選單排成一欄，「地圖工具」按鈕改疊在左下角 #compareWrapA（左右比對
+       A 側選單）正上方，避免整欄控制項互相重疊（見任務規格九）。 */
+    /* z-index:50 刻意比全站所有手機浮動列都高（含 .search-batch-bar 的
+       30、#custom-timeline-dock 的 31），確保「地圖模式」按鈕永遠在
+       最上層、不會被任何浮動面板蓋住（新手導覽／使用指南等全螢幕疊加
+       層 z-index 120 起跳，屬於刻意需要蓋過一切的情境，不受此限）。 */
+    #mobileModeBtn{
+      display:flex; align-items:center; justify-content:center;
+      position:fixed; z-index:50;
+      left:calc(10px + env(safe-area-inset-left));
+      bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 56px);
+      width:48px; height:48px; border-radius:50%;
+      background:var(--ink); color:var(--paper); border:2px solid var(--brass);
+      box-shadow:0 3px 12px rgba(0,0,0,.35); cursor:grab;
+      /* 可拖曳到螢幕任何位置（見 src/ui/mobileLayout.js 的
+         initDraggableModeButton()），touch-action:none 讓瀏覽器把整段
+         手勢交給 JS 處理，不會被系統手勢（例如捲動）搶走。 */
+      touch-action:none;
+    }
+    #mobileModeBtn:active{cursor:grabbing;}
+    #mobileModeBtn svg{width:20px; height:20px;}
+    #mobileModeBtn.active{background:var(--stamp); border-color:var(--stamp);}
+    #mobileModePopover{
+      display:none; position:fixed; z-index:50;
+      /* 預設位置只在 JS 還沒開過選單前的保險，實際每次開啟都會由
+         src/ui/mobileLayout.js 的 positionPopover() 依按鈕目前位置
+         （可能已被拖到別處）重新計算 left/top。 */
+      left:calc(10px + env(safe-area-inset-left));
+      bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 112px);
+      width:min(220px, calc(100vw - 32px));
+      background:var(--paper); border:1px solid var(--rule); border-radius:12px;
+      box-shadow:0 8px 24px rgba(0,0,0,.35); padding:8px;
+    }
+    #mobileModePopover.open{display:block;}
+    .mobile-mode-popover-title{
+      font-size:11px; font-weight:700; color:var(--rule); letter-spacing:.03em;
+      padding:4px 8px 6px;
+    }
+    .mobile-mode-option{
+      display:flex; align-items:center; gap:8px; width:100%;
+      min-height:44px; padding:8px 10px; margin-bottom:2px;
+      background:none; border:none; border-radius:8px;
+      font-family:var(--sans); font-size:13.5px; color:var(--ink); text-align:left; cursor:pointer;
+    }
+    .mobile-mode-option:last-child{margin-bottom:0;}
+    .mobile-mode-option:hover{background:var(--paper-dim);}
+    .mobile-mode-option::before{
+      content:"○"; color:var(--rule); font-size:12px; flex-shrink:0;
+    }
+    .mobile-mode-option.active{background:var(--paper-dim); font-weight:700; color:var(--brass-dark);}
+    .mobile-mode-option.active::before{content:"●"; color:var(--brass-dark);}
+
+    .mobile-mode-popover-divider{height:1px; background:var(--rule); opacity:.35; margin:4px 2px 6px;}
+    /* 繪圖工具是開關（可多次切換），不是單選，用方塊勾選視覺跟上面的
+       模式單選圓點區隔開；.active 代表繪圖工具目前是開啟狀態。 */
+    .mobile-mode-toggle::before{content:"☐"; font-size:13px;}
+    .mobile-mode-toggle.active::before{content:"☑"; color:var(--brass-dark);}
+
+    /* 「地圖模式」手風琴已經被浮動選單（#mobileModePopover）取代，
+       手機版側邊欄不再需要這排按鈕，避免同一個功能兩個地方都要維護
+       視覺一致性（見使用者回報）。#overlayPanel／#comparePanel 等模式
+       內容面板不受影響，仍依 store.mode 正常顯示/隱藏。 */
+    #modeSection{display:none;}
+
+    /* ---------- 其餘地圖下方浮動列：一律讓到底部工作表 peek 區之上 ---------- */
+    .compare-float-item{bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 8px);}
+    #mapTimelineBar{bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 8px); width:calc(100% - 24px); max-height:34vh;}
+    #multiOverlayBar{bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 8px); width:calc(100% - 24px); max-height:32vh;}
+    .search-batch-bar{bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 8px); max-width:calc(100% - 24px);}
+    #custom-timeline-dock{bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 8px); width:calc(100% - 24px);}
+    .draw-storage-toast{bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 8px); right:10px;}
+
+    /* ---------- Bottom Sheet 本體：#sidebar 從桌面左側浮動面板
+       改成貼齊底部、可拖曳三態（收合/半開/展開）的工作表。
+       #sidebar.collapsed 沿用既有「收合」class（桌面版是圓形收合鈕，
+       這裡整段覆寫成 peek 態，語意一致：都是「目前最小化」）；
+       多出來的「展開至 75vh」用 .sheet-expanded 疊加，只在
+       未收合時才有效（collapseSidebar()／#toggleSidebar 點擊都會
+       一併移除 .sheet-expanded，見 src/ui/sidebarToggle.js）。
+       高度固定在 --mobile-sheet-full，用 transform:translateY 位移出
+       露出高度的差值來實作三態，全程只用 transform + transition，
+       沒有動畫框架。 ---------- */
+    #sidebar{
+      position:fixed; left:0; right:0; top:auto; bottom:0;
+      width:100%; height:var(--mobile-sheet-full); max-height:var(--mobile-sheet-full);
+      border-radius:16px 16px 0 0; border-bottom:none;
+      box-shadow:0 -6px 24px rgba(0,0,0,.35);
+      padding-bottom:env(safe-area-inset-bottom);
+      transform:translateY(calc(var(--mobile-sheet-full) - var(--mobile-sheet-half)));
+      transition:transform .28s cubic-bezier(.4,0,.2,1);
+      z-index:20;
+    }
+    #sidebar.dragging{transition:none;}
+    #sidebar.sheet-expanded{transform:translateY(0);}
+    #sidebar.collapsed{
+      width:100%; height:var(--mobile-sheet-full); top:auto; bottom:0;
+      border-radius:16px 16px 0 0; box-shadow:0 -6px 24px rgba(0,0,0,.35);
+      transform:translateY(calc(var(--mobile-sheet-full) - var(--mobile-sheet-peek)));
+    }
+    /* 桌面版收合是 36px 圓鈕，手機版沿用同一顆按鈕但恢復成一般方形按鈕，
+       放在 peek 區內跟拖曳把手並排即可，不需要圓形浮動樣式。 */
+    #sidebar.collapsed .sidebar-header{
+      padding:8px 16px 6px; height:auto; align-items:center; justify-content:space-between;
+    }
+    #sidebar.collapsed #toggleSidebar{
+      width:36px; height:36px; border-radius:6px;
+    }
+    #sidebar #toggleSidebar{width:36px; height:36px; font-size:15px;}
+
+    .sheet-handle{
+      display:flex; align-items:center; justify-content:center;
+      width:100%; min-height:26px; padding:8px 0 4px; cursor:grab;
+      touch-action:none; flex-shrink:0;
+    }
+    .sheet-handle:active{cursor:grabbing;}
+    .sheet-handle-bar{width:40px; height:5px; border-radius:3px; background:var(--rule); opacity:.6;}
+
+    .sidebar-header{flex-shrink:0;}
+    .sidebar-body{
+      touch-action:pan-y; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+      padding-bottom:calc(18px + env(safe-area-inset-bottom));
+    }
+
+    /* ---------- 觸控友善：手風琴標題與圖層項目至少 44px 高、字級不小於 12px ---------- */
+    .side-section-head, .source-head, .category-head, .subcategory-head{min-height:44px;}
+    .layer-item{min-height:44px; padding-top:9px; padding-bottom:9px;}
+    .layer-year, .layer-title{font-size:13px;}
+    .avail-tab-btn{min-height:44px; font-size:12.5px;}
+    .avail-select-item{min-height:44px;}
+    .avail-select-checkbox{width:20px; height:20px;}
+    .mode-switch button{min-height:44px;}
+    .segmented button{min-height:44px;}
+    .layer-search-item, .favorites-item, .recent-item{min-height:44px;}
+    .layer-list-toggle{min-height:40px; line-height:24px;}
+    /* 圖例按鈕熱區加大：用絕對定位的透明偽元素撐大可點擊範圍到 34px，
+       不改動按鈕本身 18px 的視覺尺寸／不佔用 flex 版面空間，避免跟
+       .layer-year／.layer-title 擠壓換行（沿用 .layer-legend-btn 定義處的
+       版面顧慮，這裡刻意不直接放大 width/height）。 */
+    .layer-legend-btn{position:relative;}
+    .layer-legend-btn::after{
+      content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:34px; height:34px;
+    }
+    input[type=range]{min-height:32px;}
+    .opacity-row input[type=range]{height:32px;}
+    .current-layer-fav-btn, .location-clear-btn{width:32px; height:32px;}
+    .address-search-btn, .locate-search-btn{width:40px; height:40px;}
+
+    .layer-search-list{max-height:38vh;}
+    .favorites-list, .recent-list{max-height:32vh;}
+
+    /* Bottom Sheet 只要不是收合(peek)狀態，z-index 比 #sidebar 高的
+       「目前圖層」浮動列就會蓋住已經打開的面板內容（實機回報「浮動
+       功能會影響拉起選單」），這裡先藏起來；同樣的資訊在打開後的
+       「目前圖層」區塊都找得到，不影響功能完整性。body class 由
+       src/ui/mobileLayout.js 的 initSheetOpenStateSync() 同步。
+       #mobileModeBtn／#mobileModePopover 不在這裡藏——使用者希望「地圖
+       模式」按鈕永遠在最上層、不論 Sheet 開合都能點到，見下方
+       #mobileModeBtn 的 z-index。 */
+    body.mobile-sheet-open .floating-opacity.show.has-layer{
+      /* 補 .show.has-layer 兩個 class：CSS specificity 是先比對 class
+         數量，.floating-opacity.show.has-layer 那條規則（見該規則定義處）
+         本身就有 3 個 class，比這裡若只寫 .floating-opacity（1 個 class）
+         specificity 還高，後宣告也贏不了，必須補滿相同/更多 class 才能
+         確實蓋過去。 */
+      display:none !important;
+    }
+
+    /* 時間軸／複合疊圖模式的浮動列（#mapTimelineBar／#multiOverlayBar）
+       會拉到接近全寬、高度也可能偏高，跟右下角日期印章、「目前圖層」
+       浮動列搶同一塊位置（實機回報「圖資名稱遮擋時間軸」）。印章純
+       裝飾用途、「目前圖層」摘要在時間軸模式下本來就能從年份刻度看出
+       目前套疊哪一張，兩者在這兩個模式下都先藏起來，非操作入口，不
+       影響功能完整性。body class 由 src/ui/mobileLayout.js 的
+       initModeClassSync() 同步。 */
+    body.mobile-mode-timeline #stamp,
+    body.mobile-mode-multi #stamp,
+    body.mobile-mode-timeline .floating-opacity.show.has-layer{
+      /* 這裡的 .floating-opacity 要蓋掉的是 .floating-opacity.show.has-layer
+         那條 3 個 class 的 !important 規則（see 上方定義），選擇器裡多補
+         .show.has-layer 兩個 class 拉高 specificity，否則後宣告也贏不了
+         class 數較多的規則。 */
+      display:none !important;
+    }
+    /* 頂部搜尋列僅透明疊圖模式常駐，其他模式先隱藏，畫面更單純
+       （定位／繪圖工具已經全站收進「地圖工具」浮動選單，見上方
+       .locate-btn／.draw-toggle-btn／.ol-zoom{display:none} 那條規則，
+       不需要再依模式個別隱藏）。 */
+    body.mobile-mode-compare #mobileSearchBar,
+    body.mobile-mode-timeline #mobileSearchBar,
+    body.mobile-mode-multi #mobileSearchBar{
+      display:none;
+    }
+
+    /* 時間軸浮動列在手機上內容偏多（比例尺切換＋年份刻度＋播放列），
+       進一步壓縮高度與留白，讓地圖保留更多可視範圍。 */
+    #mapTimelineBar{
+      max-height:min(160px, 26vh);
+      padding:6px 10px 8px;
+    }
+    .map-timeline-bar-head{padding-bottom:3px; margin-bottom:4px;}
+    #mapTimelineBar .map-timeline-scale-switch button{padding:2px 6px; font-size:10px;}
+    #mapTimelineBar .map-timeline-refresh-btn{padding:2px 7px; font-size:10px;}
+    #mapTimelineBar .timeline-dots{padding:2px 2px 2px; gap:4px;}
+    #mapTimelineBar .timeline-dot-wrap{min-width:22px;}
+    #mapTimelineBar .timeline-dot{width:9px; height:9px;}
+    #mapTimelineBar .timeline-dot-label{font-size:9px;}
+    #mapTimelineBar .timeline-slider-row{margin:0 0 2px;}
+    #mapTimelineBar .timeline-play-btn,
+    #mapTimelineBar .timeline-speed-btn{padding:2px 8px; font-size:10px;}
+
+    /* 圖例預覽 Modal：手機版改全螢幕呈現，圖片盡量佔滿可視空間。 */
+    .legend-modal-overlay{padding:0;}
+    .legend-modal-card{
+      max-width:100vw; width:100vw; height:100%; max-height:100%;
+      border-radius:0; padding:44px 12px 12px;
+    }
+    .legend-modal-img{max-height:calc(100vh - 80px);}
+
+    /* ---------- 手機版「台灣」分頁：年代→地區→扁平圖層清單
+       （src/ui/mobileTwBrowse.js）取代來源手風琴 ----------
+       顯示與否由 sidebarUI.js 的 syncMobileTwView() 用 hidden attribute
+       控制（[hidden] 是瀏覽器內建規則，這裡用 class 選擇器 :not([hidden])
+       維持 specificity 不蓋過它，見上方 .mobile-tw-browse{display:none} 的
+       說明）。手機版「中國」「其他」分頁、以及桌機／平板任何情況都不會
+       套用這裡的規則。 */
+    .mobile-tw-browse:not([hidden]){
+      display:flex; flex-direction:column; gap:8px; margin-bottom:10px;
+    }
+    /* 手機版「台灣」分頁顯示三段式瀏覽時，隱藏對應的來源手風琴
+       （中國／其他分頁的手風琴、以及桌機任何情況都不受影響——見
+       sidebarUI.js 的 syncMobileTwView() 只對 src.country==='tw' 的
+       .source-group 加這個 class）。class 選擇器對 class 選擇器，
+       specificity 跟 .source-group 本身相當，靠後宣告蓋過去即可。 */
+    .source-group.mobile-tw-accordion-hidden{display:none;}
+
+    /* 年代／地區 chip 列：視覺比照既有 .avail-year-sort-btn／.segmented
+       語彙，橫向可滑動、不換行。 */
+    .mobile-tw-year-row, .mobile-tw-region-row{
+      display:flex; flex-wrap:nowrap; gap:6px; overflow-x:auto;
+      -webkit-overflow-scrolling:touch; padding:2px 2px 4px;
+    }
+    .mobile-tw-year-btn, .mobile-tw-region-btn{flex-shrink:0; min-height:32px;}
+    .mobile-tw-hint{font-size:12px; color:var(--rule); padding:4px 2px; line-height:1.6;}
+
+    .mobile-tw-layer-list{display:flex; flex-direction:column; gap:5px;}
+    .mobile-tw-layer-item{min-height:44px;} /* 跟 .layer-search-item 等既有清單項目一致的觸控熱區 */
+    .mobile-tw-region-heading{
+      font-family:var(--sans); font-size:11.5px; font-weight:700; color:var(--rule);
+      padding:6px 2px 2px; margin-top:2px;
+    }
+    /* 超過 8 筆（不含分隔標題）先隱藏，跟 uiTree.js 的 appendLayerList()／
+       .layer-item-overflow 同一種「先隱藏、按鈕展開整個容器切 .expanded」
+       pattern，不用 IntersectionObserver 或無限捲動。 */
+    .mobile-tw-overflow{display:none;}
+    .mobile-tw-layer-list.expanded .mobile-tw-overflow{display:block;}
+  }
+
+  @media (max-width:480px){
+    #mobileSearchBar{width:94%;}
+    #mobileSearchBar .address-input{font-size:13.5px;}
+    :root{--mobile-topbar-h:48px;}
+    #stamp{width:52px; height:52px;}
+    #stamp .stamp-year{font-size:13px;}
+    #stamp .stamp-label{display:none;} /* 過窄螢幕上省略文字，只留年份，避免跟工具按鈕擠在一起 */
+    .draw-toolbar{width:min(200px, calc(100vw - 20px));}
+    #mobileModePopover{width:min(200px, calc(100vw - 20px));}
+    .layer-search-item, .favorites-item, .recent-item, .avail-select-item{padding-left:8px; padding-right:8px;}
+    .search-batch-bar{padding:7px 12px; gap:10px;}
+    .search-batch-btn{padding:5px 9px; font-size:11px;}
+  }

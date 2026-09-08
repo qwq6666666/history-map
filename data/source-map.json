@@ -1,6 +1,7 @@
 {
   "alwaysInclude": [
-    "sinica"
+    "sinica",
+    "ls"
   ],
   "alwaysIncludeUnless": [
     {
@@ -312,6 +313,69 @@
       ],
       "sources": [
         "hongkong"
+      ]
+    },
+    {
+      "match": "county",
+      "includes": [
+        "韓國", "Korea", "South Korea", "North Korea", "首爾", "서울", "Seoul", "釜山", "Busan", "仁川", "Incheon", "木浦", "Mokpo", "馬山", "Masan", "元山", "Wonsan", "朝鮮"
+      ],
+      "sources": [
+        "korea"
+      ]
+    },
+    {
+      "match": "county",
+      "includes": [
+        "日本", "Japan", "東京", "Tokyo", "大阪", "Osaka", "神戶", "Kobe", "橫濱", "横浜", "Yokohama", "沖繩", "琉球", "Okinawa", "Ryukyu", "下田", "Shimoda", "函館", "Hakodate", "四日市", "Yokkaichi", "浦賀", "Uraga"
+      ],
+      "sources": [
+        "japan"
+      ]
+    },
+    {
+      "match": "county",
+      "includes": [
+        "東南亞", "Southeast Asia", "泰國", "Thailand", "曼谷", "Bangkok", "印尼", "Indonesia", "雅加達", "雅加达", "Jakarta", "Batavia", "巴達維亞", "菲律賓", "Philippines", "宿霧", "Cebu", "馬尼拉", "Manila", "越南", "Vietnam", "海防", "Haiphong", "馬來西亞", "Malaysia", "吉隆坡", "Kuala Lumpur", "Kualalumpur", "納閩", "Labuan", "新加坡", "Singapore"
+      ],
+      "sources": [
+        "southeast_asia"
+      ]
+    },
+    {
+      "match": "county+district",
+      "includes": [
+        "淡水"
+      ],
+      "sources": [
+        "tamsui"
+      ]
+    },
+    {
+      "match": "county+district",
+      "includes": [
+        "埔里"
+      ],
+      "sources": [
+        "puli"
+      ]
+    },
+    {
+      "match": "county",
+      "includes": [
+        "澎湖"
+      ],
+      "sources": [
+        "penghu"
+      ]
+    },
+    {
+      "match": "county",
+      "includes": [
+        "臺東", "台東"
+      ],
+      "sources": [
+        "taitung"
       ]
     }
   ],

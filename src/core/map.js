@@ -10,12 +10,27 @@
 --------------------------------------------------------- */
 import { state as store, setBaseLayer } from '../store.js';
 import { REGION_EXTENTS } from '../data.js';
+import { getBaseLayerConfig } from '../config/baseLayers.js';
 
-const SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const osmConfig = getBaseLayerConfig('osm');
+const satConfig = getBaseLayerConfig('sat');
 
-const osmLayer = new ol.layer.Tile({ source: new ol.source.OSM({ crossOrigin: 'anonymous' }), visible: true });
+const osmLayer = new ol.layer.Tile({
+  source: new ol.source.OSM({
+    crossOrigin: 'anonymous',
+    minZoom: osmConfig.minZoom,
+    maxZoom: osmConfig.maxZoom
+  }),
+  visible: true
+});
 const satLayer = new ol.layer.Tile({
-  source: new ol.source.XYZ({ url: SAT_URL, attributions: 'Esri, Maxar, Earthstar Geographics', crossOrigin: 'anonymous' }),
+  source: new ol.source.XYZ({
+    url: satConfig.urlTemplate,
+    attributions: satConfig.attribution,
+    crossOrigin: 'anonymous',
+    minZoom: satConfig.minZoom,
+    maxZoom: satConfig.maxZoom
+  }),
   visible: false
 });
 
@@ -25,8 +40,11 @@ export const map = new ol.Map({
   view: new ol.View({
     center: ol.proj.fromLonLat([120.9, 23.7]),
     zoom: 8,
-    minZoom: 3,
-    maxZoom: 21
+    // View 的縮放範圍取兩個底圖設定的聯集，確保切換底圖時都能用滿
+    // 各自允許的縮放級距（實際圖磚可用範圍仍由各 Source 的
+    // minZoom/maxZoom 限制，超出範圍時 OL 會 overzoom 既有圖磚）。
+    minZoom: Math.min(osmConfig.minZoom, satConfig.minZoom),
+    maxZoom: Math.max(osmConfig.maxZoom, satConfig.maxZoom)
   })
 });
 
@@ -38,6 +56,28 @@ export const map = new ol.Map({
 export function flyToSourceExtent(srcId){
   const ext = REGION_EXTENTS[srcId];
   if(!ext) return;
+  const extent3857 = ol.proj.transformExtent(ext, 'EPSG:4326', 'EPSG:3857');
+  map.getView().fit(extent3857, { duration:700, padding:[40,40,40,40], maxZoom:14 });
+}
+
+/* ---------------------------------------------------------
+   點擊展開「分類」時，把地圖移動到該分類涵蓋的地理範圍——目前只給
+   日本／韓國／東南亞這幾個橫跨多個城市的來源用（分類＝城市，例如
+   「函館」「釜山」「曼谷」，跟其他來源「分類＝地圖系列」不同，展開
+   分類時飛到對應城市才有意義，見 sidebarUI.js 呼叫端的白名單）。
+   分類本身沒有預先算好的 bbox，直接從底下每張圖層的 region.bbox
+   （沿用 tools/fetch-wmts-bbox.js 寫入的資料）取聯集算出來，沒有任何
+   圖層帶 bbox 時就不動作。
+--------------------------------------------------------- */
+export function flyToCategoryExtent(cat){
+  if(!cat) return;
+  const layers = cat.groups ? cat.groups.flatMap(g => g.layers) : cat.layers;
+  const bboxes = (layers || []).map(l => l.region && l.region.bbox).filter(Boolean);
+  if(bboxes.length === 0) return;
+  const ext = bboxes.reduce((acc, b) => [
+    Math.min(acc[0], b[0]), Math.min(acc[1], b[1]),
+    Math.max(acc[2], b[2]), Math.max(acc[3], b[3])
+  ], [...bboxes[0]]);
   const extent3857 = ol.proj.transformExtent(ext, 'EPSG:4326', 'EPSG:3857');
   map.getView().fit(extent3857, { duration:700, padding:[40,40,40,40], maxZoom:14 });
 }

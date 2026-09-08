@@ -12,8 +12,11 @@ model: sonnet
 你僅能檢視與修改資料設定檔、詮釋資料以及打包建置工具：
 - 城市與區域圖層：`data/layers/*.json`(包含 `taipei.json`、`tainan.json`、`index.json` 等)
 - 歷史名稱與來源映射：`data/historical-names.json`、`data/source-map.json`
-- 資料打包與載入：`data/layers.bundle.json`、`src/data.js`、`tools/build-layers-bundle.js`
+- 資料打包與載入：`data/layers.bundle.json`、`src/data.js`、`tools/build-layers-bundle.js`、`tools/tag-layer-types.js`（圖層類型自動打標，CLAUDE.md 資料管線守則明訂新增圖層後、打包前要執行）
+- WMTS Capabilities 空間索引建置：`tools/fetch-wmts-bbox.js`（解析中研院 WMTS Capabilities XML，將每個 Layer 的 `ows:WGS84BoundingBox` 寫入對應來源檔案的 `layer.region.bbox`，供前端做 bbox 空間篩選）
+- 圖例索引建置：`tools/fetch-legend-map.js`（解析 twhgis 入口網站的圖層清單 API，把有圖例連結的圖層 id 對應到 `layer.legend` URL，寫回對應來源檔案）
 - 跨網域代理服務：`tools/cors-proxy-worker/`
+- 預設歷史主題圖資目錄：`data/presets/`（供使用者按需 `fetch()` 載入的主題 GeoJSON，如車站、河道等；不得在 JS 模組頂層靜態 import）
 
 # 核心工作準則
 1. **圖層 Schema 一致性 (JSON Schema Integrity)：**
@@ -25,4 +28,5 @@ model: sonnet
 
 # 驗證規範
 - 資料更新後必須驗證資料載入與來源匹配測試：
-  `node tests/run-all.mjs tests/specs/data-loading.test.mjs tests/specs/source-matching.test.mjs tests/specs/custom-sources.test.mjs`
+  `node tests/run-all.mjs tests/specs/data-loading.test.mjs tests/specs/source-matching.test.mjs tests/specs/custom-sources.test.mjs tests/specs/search-two-tier.test.mjs`
+  （`search-two-tier.test.mjs` 測的是 `src/data.js` 的 `prefilterLayersByPlaceName`，屬於本代理權責檔案）
