@@ -29,7 +29,9 @@ let anyFailed = false;
 for(const file of files){
   console.log(`\n=== ${file} ===`);
   try{
-    const output = execFileSync('node', [path.join(specsDir, file)], {
+    // 用 process.execPath（目前執行中 node 執行檔的絕對路徑）取代裸字串 'node'，
+    // 避免透過 PATH 搜尋解析執行檔（PATH injection 風險）。
+    const output = execFileSync(process.execPath, [path.join(specsDir, file)], {
       cwd: path.join(__dirname, '..'),
       encoding: 'utf-8',
     });
