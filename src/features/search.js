@@ -33,7 +33,7 @@
 --------------------------------------------------------- */
 import { runtime } from '../runtime.js';
 import {
-  LAYER_SOURCES, REGION_EXTENTS, layerKey,
+  DATA, layerKey,
   matchSourceIdsForAddress, extractPlaceKeywords, prefilterLayersByPlaceName
 } from '../data.js';
 import { TileChecker, globalTileRequestPool } from '../tileChecker.js';
@@ -96,10 +96,10 @@ export function filterCandidatesByBbox(candidates, lon, lat){
 export async function findAvailableLayersAt(lon, lat, addr, { onProgress, isStale } = {}){
   const sourceIds = matchSourceIdsForAddress(addr);
   const bboxExcluded = []; // 記錄被座標 bbox 排除掉的來源名稱，僅供進度顯示參考
-  const candidateSources = LAYER_SOURCES.filter(s=>{
+  const candidateSources = DATA.LAYER_SOURCES.filter(s=>{
     if(!sourceIds.includes(s.id)) return false;
-    const nearby = isPointNearExtent(lon, lat, REGION_EXTENTS[s.id]);
-    if(!nearby) bboxExcluded.push({ name: s.name, extent: REGION_EXTENTS[s.id] });
+    const nearby = isPointNearExtent(lon, lat, DATA.REGION_EXTENTS[s.id]);
+    if(!nearby) bboxExcluded.push({ name: s.name, extent: DATA.REGION_EXTENTS[s.id] });
     return nearby;
   });
   const placeKeywords = extractPlaceKeywords(addr);

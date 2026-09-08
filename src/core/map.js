@@ -9,7 +9,7 @@
    「這是一張地圖，現在用哪張底圖」。
 --------------------------------------------------------- */
 import { state as store, setBaseLayer } from '../store.js';
-import { REGION_EXTENTS } from '../data.js';
+import { DATA } from '../data.js';
 import { getBaseLayerConfig } from '../config/baseLayers.js';
 
 const osmConfig = getBaseLayerConfig('osm');
@@ -54,7 +54,7 @@ export const map = new ol.Map({
    視角操作，不是「目前應該顯示什麼」的持續狀態，所以不透過 store。
 --------------------------------------------------------- */
 export function flyToSourceExtent(srcId){
-  const ext = REGION_EXTENTS[srcId];
+  const ext = DATA.REGION_EXTENTS[srcId];
   if(!ext) return;
   const extent3857 = ol.proj.transformExtent(ext, 'EPSG:4326', 'EPSG:3857');
   map.getView().fit(extent3857, { duration:700, padding:[40,40,40,40], maxZoom:14 });

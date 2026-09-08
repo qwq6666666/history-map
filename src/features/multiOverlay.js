@@ -42,7 +42,7 @@ import {
   removeCustomSource,
   clearCustomSources
 } from '../store.js';
-import { LAYER_SOURCES, layerKey, titleForKey, setCustomSourcesProvider } from '../data.js';
+import { DATA, layerKey, titleForKey, setCustomSourcesProvider } from '../data.js';
 import { buildCategoryList } from '../uiTree.js';
 import { createCountryFilterBar } from '../ui/countryFilter.js';
 import { setLayerOpacity } from '../core/layerCache.js';
@@ -59,7 +59,7 @@ export function initMultiOverlayUI(){
   const { bar: filterBar, refresh: refreshCountryFilter } = createCountryFilterBar(() => sourceWraps);
   multiCategoriesEl.appendChild(filterBar);
 
-  LAYER_SOURCES.forEach((src) => {
+  DATA.LAYER_SOURCES.forEach((src) => {
     const srcWrap = document.createElement('div');
     srcWrap.className = 'source-group';
 

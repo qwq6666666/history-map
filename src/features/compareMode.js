@@ -19,7 +19,7 @@
 --------------------------------------------------------- */
 import { state as store, setCompareSide, setSwipePercent } from '../store.js';
 import { runtime } from '../runtime.js';
-import { LAYER_SOURCES, makeSourceForKey, titleForKey } from '../data.js';
+import { DATA, makeSourceForKey, titleForKey } from '../data.js';
 import { buildCategoryList } from '../uiTree.js';
 import { map } from '../core/map.js';
 import { collapseSidebar } from '../ui/sidebarToggle.js';
@@ -240,7 +240,7 @@ function buildPickerPanel(panelEl, onSelect){
   const { bar: filterBar, refresh: refreshCountryFilter } = createCountryFilterBar(() => sourceWraps);
   panelEl.appendChild(filterBar);
 
-  LAYER_SOURCES.forEach(src=>{
+  DATA.LAYER_SOURCES.forEach(src=>{
     const srcWrap = document.createElement('div');
     srcWrap.className = 'source-group';
     const srcHead = document.createElement('button');
