@@ -153,62 +153,74 @@ const CATEGORY_ORDER = [
 // ---------------------------------------------------------
 // 年份／群組判定：依分類各自邏輯換算西元年（民國年 + 1911）
 // ---------------------------------------------------------
+function yearInfoForPhoto(id, title){
+  const m = id.match(/^PHOTO(\d{4})$/);
+  if(m) return { year: parseInt(m[1], 10), dateLabel: m[1] };
+  const ty = title.match(/(\d+)年/);
+  if(ty){
+    const west = parseInt(ty[1], 10) + 1911;
+    return { year: west, dateLabel: String(west) };
+  }
+  return { year: null, dateLabel: '現代' };
+}
+
+function yearInfoForTopo(id){
+  const m = id.match(/^(?:TOPO25K_|TOPO50K_|TOPO10M_|TOPO05KPHOTO_)(\d+)$/);
+  if(m){
+    const west = parseInt(m[1], 10) + 1911;
+    return { year: west, dateLabel: String(west) };
+  }
+  return { year: null, dateLabel: '現代' }; // B100000/B25000/B50000/B5000/TOPO10KPHOTO
+}
+
+function yearInfoForLuimap(id, title){
+  const m = id.match(/^LUIMAP(\d+)$/);
+  if(!m) return { year: null, dateLabel: '現代' }; // 裸 LUIMAP（綜合成果圖，無單一年份）
+  const num = parseInt(m[1], 10);
+  if(num <= 9) return { year: null, dateLabel: '現代' }; // LUIMAP01~09：土地利用類別，非年份
+  const rangeM = title.match(/(\d+)-(\d+)年/);
+  if(rangeM){
+    const w1 = parseInt(rangeM[1], 10) + 1911;
+    const w2 = parseInt(rangeM[2], 10) + 1911;
+    return { year: w1, dateLabel: `${w1}-${w2}` };
+  }
+  const west = num + 1911;
+  return { year: west, dateLabel: String(west) };
+}
+
+function yearInfoForTerrainAnalysis(title){
+  const rangeM = title.match(/\((\d{4})-(\d{4})\)/); // 已是西元年區間，不用換算
+  if(rangeM) return { year: parseInt(rangeM[1], 10), dateLabel: `${rangeM[1]}-${rangeM[2]}` };
+  return { year: null, dateLabel: '現代' };
+}
+
+function yearInfoForAdmin(title){
+  const m = title.match(/(\d+)年(\d+)月/); // 例：村里界(108年10月)
+  if(m){
+    const west = parseInt(m[1], 10) + 1911;
+    return { year: west, dateLabel: String(west) };
+  }
+  return { year: null, dateLabel: '現代' };
+}
+
+function yearInfoForAsrs(id){
+  if(id === 'Asrs_2025_ortho') return { year: 2025, dateLabel: '2025' };
+  const m = id.match(/^Asrs_(\d{4})(\d{2})(\d{2})_\d+$/);
+  if(m){
+    const [, y, mo, d] = m;
+    return { year: parseInt(y, 10), dateLabel: `${y}/${mo}/${d}` };
+  }
+  return { year: null, dateLabel: '現代' };
+}
+
 function computeYearInfo(category, id, title){
   switch(category){
-    case 'photo': {
-      const m = id.match(/^PHOTO(\d{4})$/);
-      if(m) return { year: parseInt(m[1], 10), dateLabel: m[1] };
-      const ty = title.match(/(\d+)年/);
-      if(ty){
-        const west = parseInt(ty[1], 10) + 1911;
-        return { year: west, dateLabel: String(west) };
-      }
-      return { year: null, dateLabel: '現代' };
-    }
-    case 'topo': {
-      const m = id.match(/^(?:TOPO25K_|TOPO50K_|TOPO10M_|TOPO05KPHOTO_)(\d+)$/);
-      if(m){
-        const west = parseInt(m[1], 10) + 1911;
-        return { year: west, dateLabel: String(west) };
-      }
-      return { year: null, dateLabel: '現代' }; // B100000/B25000/B50000/B5000/TOPO10KPHOTO
-    }
-    case 'luimap': {
-      const m = id.match(/^LUIMAP(\d+)$/);
-      if(!m) return { year: null, dateLabel: '現代' }; // 裸 LUIMAP（綜合成果圖，無單一年份）
-      const num = parseInt(m[1], 10);
-      if(num <= 9) return { year: null, dateLabel: '現代' }; // LUIMAP01~09：土地利用類別，非年份
-      const rangeM = title.match(/(\d+)-(\d+)年/);
-      if(rangeM){
-        const w1 = parseInt(rangeM[1], 10) + 1911;
-        const w2 = parseInt(rangeM[2], 10) + 1911;
-        return { year: w1, dateLabel: `${w1}-${w2}` };
-      }
-      const west = num + 1911;
-      return { year: west, dateLabel: String(west) };
-    }
-    case 'terrain-analysis': {
-      const rangeM = title.match(/\((\d{4})-(\d{4})\)/); // 已是西元年區間，不用換算
-      if(rangeM) return { year: parseInt(rangeM[1], 10), dateLabel: `${rangeM[1]}-${rangeM[2]}` };
-      return { year: null, dateLabel: '現代' };
-    }
-    case 'admin': {
-      const m = title.match(/(\d+)年(\d+)月/); // 例：村里界(108年10月)
-      if(m){
-        const west = parseInt(m[1], 10) + 1911;
-        return { year: west, dateLabel: String(west) };
-      }
-      return { year: null, dateLabel: '現代' };
-    }
-    case 'asrs': {
-      if(id === 'Asrs_2025_ortho') return { year: 2025, dateLabel: '2025' };
-      const m = id.match(/^Asrs_(\d{4})(\d{2})(\d{2})_\d+$/);
-      if(m){
-        const [, y, mo, d] = m;
-        return { year: parseInt(y, 10), dateLabel: `${y}/${mo}/${d}` };
-      }
-      return { year: null, dateLabel: '現代' };
-    }
+    case 'photo': return yearInfoForPhoto(id, title);
+    case 'topo': return yearInfoForTopo(id);
+    case 'luimap': return yearInfoForLuimap(id, title);
+    case 'terrain-analysis': return yearInfoForTerrainAnalysis(title);
+    case 'admin': return yearInfoForAdmin(title);
+    case 'asrs': return yearInfoForAsrs(id);
     default:
       return { year: null, dateLabel: '現代' };
   }
@@ -224,25 +236,35 @@ function computeScale(category, id){
   return null;
 }
 
+function groupNameForPhoto(id){
+  return /^PHOTO\d{4}$/.test(id) ? '各年正射影像' : '综合影像';
+}
+
+function groupNameForTopo(id){
+  if(/^(?:B25000|TOPO25K_)/.test(id)) return '1/25000地形圖';
+  if(/^(?:B50000|TOPO50K_)/.test(id)) return '1/50000地形圖';
+  if(/^(?:B100000|TOPO10M_)/.test(id)) return '1/10萬地形圖';
+  if(/^(?:B5000|TOPO05KPHOTO_)/.test(id)) return '1/5000像片基本圖';
+  return '其他比例尺圖幅'; // TOPO10KPHOTO
+}
+
+function groupNameForLuimap(id){
+  const m = id.match(/^LUIMAP(\d+)$/);
+  if(m && parseInt(m[1], 10) <= 9) return '土地利用類別';
+  return '歷年更新區';
+}
+
+function groupNameForAsrs(id){
+  return id === 'Asrs_2025_ortho' ? '災前正射影像' : null; // 其餘用 dateLabel 當群組名，下面組裝時處理
+}
+
 // 群組判定：只有 grouped === true 的分類需要
 function computeGroupName(category, id){
   switch(category){
-    case 'photo':
-      return /^PHOTO\d{4}$/.test(id) ? '各年正射影像' : '综合影像';
-    case 'topo': {
-      if(/^(?:B25000|TOPO25K_)/.test(id)) return '1/25000地形圖';
-      if(/^(?:B50000|TOPO50K_)/.test(id)) return '1/50000地形圖';
-      if(/^(?:B100000|TOPO10M_)/.test(id)) return '1/10萬地形圖';
-      if(/^(?:B5000|TOPO05KPHOTO_)/.test(id)) return '1/5000像片基本圖';
-      return '其他比例尺圖幅'; // TOPO10KPHOTO
-    }
-    case 'luimap': {
-      const m = id.match(/^LUIMAP(\d+)$/);
-      if(m && parseInt(m[1], 10) <= 9) return '土地利用類別';
-      return '歷年更新區';
-    }
-    case 'asrs':
-      return id === 'Asrs_2025_ortho' ? '災前正射影像' : null; // 其餘用 dateLabel 當群組名，下面組裝時處理
+    case 'photo': return groupNameForPhoto(id);
+    case 'topo': return groupNameForTopo(id);
+    case 'luimap': return groupNameForLuimap(id);
+    case 'asrs': return groupNameForAsrs(id);
     default:
       return null;
   }

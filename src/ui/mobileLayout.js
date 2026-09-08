@@ -74,6 +74,21 @@ function updateViewportMetrics(){
    只是輸入框獨立浮在地圖最上方，符合「搜尋比桌面更好找、但結果
    不塞進窄欄」的手機版需求，同時完全不用複製任何一段搜尋邏輯。
 --------------------------------------------------------- */
+function moveSearchRowToMobile(searchRow, suggestEl, mobileBar, addressInput){
+  if(searchRow.parentElement !== mobileBar) mobileBar.appendChild(searchRow);
+  if(suggestEl.parentElement !== mobileBar) mobileBar.appendChild(suggestEl);
+  if(addressInput){
+    if(desktopPlaceholder === null) desktopPlaceholder = addressInput.placeholder;
+    addressInput.placeholder = MOBILE_PLACEHOLDER;
+  }
+}
+
+function moveSearchRowToDesktop(searchRow, suggestEl, searchBlock, locationResultEl, addressInput){
+  if(searchRow.parentElement !== searchBlock) searchBlock.insertBefore(searchRow, locationResultEl);
+  if(suggestEl.parentElement !== searchBlock) searchBlock.insertBefore(suggestEl, locationResultEl);
+  if(addressInput && desktopPlaceholder !== null) addressInput.placeholder = desktopPlaceholder;
+}
+
 function relocateSearchBar(isMobile){
   const searchBlock = document.querySelector('.search-block');
   const searchRow = searchBlock?.querySelector('.search-row');
@@ -84,16 +99,9 @@ function relocateSearchBar(isMobile){
   if(!searchBlock || !searchRow || !suggestEl || !locationResultEl || !mobileBar) return;
 
   if(isMobile){
-    if(searchRow.parentElement !== mobileBar) mobileBar.appendChild(searchRow);
-    if(suggestEl.parentElement !== mobileBar) mobileBar.appendChild(suggestEl);
-    if(addressInput){
-      if(desktopPlaceholder === null) desktopPlaceholder = addressInput.placeholder;
-      addressInput.placeholder = MOBILE_PLACEHOLDER;
-    }
+    moveSearchRowToMobile(searchRow, suggestEl, mobileBar, addressInput);
   } else {
-    if(searchRow.parentElement !== searchBlock) searchBlock.insertBefore(searchRow, locationResultEl);
-    if(suggestEl.parentElement !== searchBlock) searchBlock.insertBefore(suggestEl, locationResultEl);
-    if(addressInput && desktopPlaceholder !== null) addressInput.placeholder = desktopPlaceholder;
+    moveSearchRowToDesktop(searchRow, suggestEl, searchBlock, locationResultEl, addressInput);
   }
 }
 
