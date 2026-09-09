@@ -107,7 +107,7 @@ export async function fetchCapabilities(url){
     // 使用者看得懂的錯誤訊息（「讀不到任何圖層…」），不需要重複的錯誤處理。
     capabilities = null;
   }
-  if(!capabilities || !capabilities.Contents || !Array.isArray(capabilities.Contents.Layer) || capabilities.Contents.Layer.length === 0){
+  if(!capabilities?.Contents || !Array.isArray(capabilities.Contents.Layer) || capabilities.Contents.Layer.length === 0){
     throw new Error('讀不到任何圖層，請確認這是正確的 WMTS GetCapabilities XML 網址');
   }
 
@@ -134,7 +134,7 @@ export function buildWmtsEntryConfig(capabilities, identifier){
   }catch(err){
     return null;
   }
-  if(!options || !options.tileGrid) return null;
+  if(!options?.tileGrid) return null;
 
   const tileGrid = options.tileGrid;
   return {
