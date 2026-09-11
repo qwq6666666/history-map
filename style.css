@@ -17,7 +17,35 @@
      所有用 .hidden 屬性控制顯示的元素都適用，不用每個 class 各自補一次。 */
   [hidden]{display:none !important;}
   html,body{margin:0;padding:0;height:100%;font-family:var(--sans);background:var(--ink);}
-  #map{position:absolute;inset:0;background:#0e1512;}
+  #map{position:absolute;inset:0;background:var(--paper-dim);}
+
+  /* ---------- Map Loading Overlay ---------- */
+  /* 地圖瓦片載入完成前的置中提示，避免 #map 純色背景在弱網/手機情境下
+     被誤認為當機。body.map-ready 由 src/core/map.js 在地圖第一次完整
+     渲染完成時加上，這裡只靠 CSS 淡出，不額外掛 JS。 */
+  .map-loading{
+    position:absolute;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:14px;
+    z-index:5;
+    opacity:1;
+    transition:opacity .4s ease;
+  }
+  .map-loading-spinner{
+    width:32px; height:32px;
+    border:3px solid var(--paper);
+    border-top-color:var(--brass);
+    border-radius:50%;
+    animation:map-loading-spin .8s linear infinite;
+  }
+  @keyframes map-loading-spin{
+    to{transform:rotate(360deg);}
+  }
+  body.map-ready .map-loading{opacity:0; pointer-events:none;}
 
   /* ---------- Sidebar ---------- */
   #sidebar{
@@ -492,6 +520,59 @@
     width:20px; height:20px; border-radius:50%; cursor:pointer; font-size:11px; line-height:1;
   }
   .location-clear-btn:hover{border-color:var(--stamp); color:var(--stamp);}
+
+  /* ---------- 地名今昔對照卡：地址搜尋命中「地名今昔對照」資料時，顯示
+     在搜尋結果最上方（座標資訊／可用圖層清單之前）的可收合卡片。用
+     hidden attribute 控制整卡顯示/隱藏（不加 ID 選擇器蓋 display，避免
+     CLAUDE.md 提過的 specificity 陷阱），內容區塊收合則靠 .collapsed
+     這個 class（class 對 class，一樣安全）。 ---------- */
+  .place-name-card{
+    margin:0 0 10px; padding:8px 9px; border:1px solid var(--brass-dark); border-radius:3px;
+    background:rgba(181,140,74,.08);
+  }
+  .place-name-card-head{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .place-name-card-title{
+    font-family:var(--serif); font-size:12.5px; font-weight:600; color:var(--brass-dark);
+  }
+  .place-name-card-toggle{
+    flex-shrink:0; background:none; border:1px solid var(--rule); color:var(--ink);
+    width:20px; height:20px; border-radius:50%; cursor:pointer; font-size:11px; line-height:1;
+  }
+  .place-name-card-toggle:hover{border-color:var(--brass-dark); color:var(--brass-dark);}
+  .place-name-card-body{margin-top:8px; display:flex; flex-direction:column; gap:6px;}
+  .place-name-card.collapsed .place-name-card-body{display:none;}
+
+  .place-name-row{font-size:12px; color:var(--ink); line-height:1.6;}
+  .place-name-row-label{
+    color:var(--brass-dark); font-weight:600; font-size:11px; letter-spacing:.02em; margin-right:4px;
+  }
+  .place-name-row-value{word-break:break-word;}
+  .place-name-alias-list{display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;}
+  .place-name-alias-tag{
+    display:inline-block; padding:1px 7px; border:1px solid var(--rule); border-radius:10px;
+    background:var(--paper); font-size:11px; color:var(--ink); line-height:1.5;
+  }
+  .place-name-desc-toggle-btn{
+    display:inline-block; margin-left:4px; background:none; border:1px solid var(--rule); border-radius:2px;
+    color:var(--brass-dark); font-family:var(--sans); font-size:11px; line-height:1.3;
+    padding:1px 6px; cursor:pointer; white-space:nowrap;
+  }
+  .place-name-desc-toggle-btn:hover{border-color:var(--brass-dark); background:var(--paper-dim);}
+
+  /* 候選清單重用 .address-suggest／.address-suggest-item 容器（見
+     src/ui/mobileLayout.js 的 relocateSearchBar() 只搬移這個既有節點，
+     不需要另外新增容器），用 .place-name-suggest-item 疊加地名專屬樣式。 */
+  .place-name-suggest-item{
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  }
+  .place-name-suggest-name{font-weight:600; color:var(--ink);}
+  .place-name-suggest-loc{font-size:11px; color:var(--rule);}
+  .place-name-suggest-type{
+    flex-shrink:0; margin-left:auto; padding:1px 7px; border-radius:10px;
+    background:var(--brass-dark); color:var(--paper); font-size:10.5px; line-height:1.6;
+  }
 
   /* ---------- 座標資訊區塊：用於地圖 Pin 點 Popup／搜尋結果詳細卡片，
      顯示 WGS84／TWD97 兩種座標系統並提供一鍵複製。風格比照上方
@@ -1428,6 +1509,7 @@
   .guide-acc-item.open .guide-acc-head::after{transform:rotate(90deg);}
   .guide-acc-body{
     display:none; padding:0 2px 14px; font-size:12.5px; color:var(--ink); line-height:1.65;
+    white-space:pre-line; /* 內容字串用 \n\n 分段（見 src/ui/onboarding.js 的 GUIDE_SECTIONS），交給 CSS 保留斷行，不用另外拼 <p>/<br> 標籤 */
   }
   .guide-acc-item.open .guide-acc-body{display:block;}
 
@@ -1490,6 +1572,13 @@
   /* 地址／圖資搜尋合併切換鈕：只在手機版有意義（見下方 @media），桌面版
      兩個 .search-block 各自獨立顯示、不需要切換，一律隱藏。 */
   .mobile-search-mode-btn{display:none;}
+  /* 地址輸入框快速清除鈕：只在手機版有意義（桌面版已有 #clearLocationBtn
+     清除已完成的搜尋結果，輸入框本身不需要另一顆清除鈕），桌面版一律
+     隱藏。手機版顯示規則見下方 @media，刻意用 class 選擇器
+     `.address-input-clear-btn:not([hidden])` 而不是 ID 選擇器，避免蓋過
+     `[hidden]{display:none}` 造成 hidden 屬性怎麼設都藏不住（CLAUDE.md
+     已記錄過同類陷阱）。 */
+  .address-input-clear-btn{display:none;}
 
   /* 手機版「台灣」分頁三段式瀏覽（src/ui/mobileTwBrowse.js）：桌機／
      平板一律隱藏，只在下方 @media (max-width:768px) 且 sidebarUI.js 的
@@ -1537,6 +1626,17 @@
       left:calc(100% - 44px - 10px - env(safe-area-inset-right));
       transform:translateX(0);
       width:44px; max-width:44px;
+      /* 保底裁切：萬一內部子元素（例如輸入框內容較長時）沒有完全收到
+         0 寬，外層容器本身也強制裁掉溢出部分，避免殘留一條長條，只留
+         乾淨的 44px 圓鈕。 */
+      overflow:hidden;
+    }
+    /* 收合時輸入框已無法互動，先前展開的地址建議清單／圖資搜尋結果面板
+       一併視覺隱藏，避免圓鈕旁邊留一塊浮動面板看起來像沒收乾淨的長條
+       （內容與 .show/開啟狀態不清除，展開時原樣恢復）。 */
+    #mobileSearchBar.mobile-search-collapsed .address-suggest,
+    #mobileSearchBar.mobile-search-collapsed .layer-search-panel{
+      display:none;
     }
     #mobileSearchBar .search-row{
       background:var(--paper); border:1px solid var(--rule); border-radius:22px;
@@ -1560,6 +1660,10 @@
       width:40px; height:40px; border-radius:50%; flex-shrink:0;
       transition:transform .32s cubic-bezier(.4,0,.2,1);
     }
+    /* 地址輸入框快速清除鈕：手機版有內容（未設 hidden）時才顯示，跟
+       #layerSearchClearBtn 視覺／尺寸一致（沿用上面 .address-search-btn
+       的圓鈕樣式）。 */
+    .address-input-clear-btn:not([hidden]){display:flex; align-items:center; justify-content:center;}
     #mobileSearchBar #locateSearchBtn{
       /* 定位鈕跟輸入框一起淡出/收合，只留放大鏡圓鈕代表整條搜尋列 */
       transition:flex-basis .32s cubic-bezier(.4,0,.2,1), width .32s cubic-bezier(.4,0,.2,1),
@@ -1572,7 +1676,8 @@
     #mobileSearchBar.mobile-search-collapsed .address-input,
     #mobileSearchBar.mobile-search-collapsed #locateSearchBtn,
     #mobileSearchBar.mobile-search-collapsed #mobileSearchModeBtn,
-    #mobileSearchBar.mobile-search-collapsed #layerSearchClearBtn{
+    #mobileSearchBar.mobile-search-collapsed #layerSearchClearBtn,
+    #mobileSearchBar.mobile-search-collapsed #addressInputClearBtn{
       flex:0 0 0; width:0; min-width:0; opacity:0; margin:0; padding:0;
       border:none; pointer-events:none; overflow:hidden;
     }
@@ -1595,6 +1700,19 @@
       position:absolute; top:calc(100% + 6px); left:0; right:0;
       border-radius:12px; max-height:min(360px, 55vh);
     }
+    /* 圖資搜尋結果面板（#layerSearchPanel）比照地址建議清單，改成浮在
+       輸入框正下方、自己捲動的懸浮卡片，不再塞進下方 Bottom Sheet
+       （見 src/ui/mobileLayout.js 的 relocateLayerSearchRow()：手機版會
+       把 #layerSearchPanel 一起搬進 #mobileSearchBar）。桌面版的
+       position/z-index 等本來就是絕對定位疊在輸入框下方，這裡只需要
+       覆寫錨定基準（原本相對 .layer-search-block，搬進 #mobileSearchBar
+       後改成相對它）跟圓角／收斂高度，視覺對齊 .address-suggest。 */
+    #mobileSearchBar .layer-search-panel{
+      top:calc(100% + 6px); left:0; right:0;
+      border-radius:12px; max-height:min(360px, 55vh); overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+    #mobileSearchBar .layer-search-panel .layer-search-list{max-height:none;}
 
     /* ---------- 地址／圖資搜尋合併成一個輸入框 ----------
        兩個 .search-row（.address-search-row／.layer-search-row）都會被
@@ -1619,10 +1737,19 @@
        蓋掉，不呼叫 hideSuggest()，內容與 .show class 都原封不動保留，
        切回地點模式馬上恢復顯示。 */
     body.mobile-search-mode-layer #mobileSearchBar .address-suggest{display:none;}
+    /* 切到地址模式時，圖資搜尋結果面板（若剛好還開著）一併強制隱藏，
+       同樣只是視覺蓋掉、不清除任何狀態。#layerSearchPanel 已經被
+       relocateLayerSearchRow() 搬進 #mobileSearchBar，不再是
+       .layer-search-block 的子節點，下面「非啟用中的搜尋整塊隱藏」那條
+       規則管不到它，要另外補這條。刻意用 class 選擇器 .layer-search-panel
+       （不用 #layerSearchPanel ID），比照專案一貫用 class 操作顯示/隱藏
+       的慣例。 */
+    body.mobile-search-mode-address #mobileSearchBar .layer-search-panel{display:none;}
 
-    /* 非啟用中的搜尋整塊（含各自結果面板 #locationResult／
-       #layerSearchPanel）在手機版隱藏，只用 CSS class 隱藏、不清除任何
-       搜尋狀態，切回來時先前的搜尋結果原封不動還在，不用重新搜。 */
+    /* 非啟用中的搜尋整塊（含地址結果面板 #locationResult，圖資搜尋列與
+       其結果面板 #layerSearchPanel 已搬進 #mobileSearchBar、由上面兩條
+       規則各自處理）在手機版隱藏，只用 CSS class 隱藏、不清除任何搜尋
+       狀態，切回來時先前的搜尋結果原封不動還在，不用重新搜。 */
     body.mobile-search-mode-layer .search-block:not(.layer-search-block){display:none;}
     body.mobile-search-mode-address .layer-search-block{display:none;}
 
@@ -1643,6 +1770,19 @@
     }
     .draw-tool-btn{padding:9px 4px; min-height:44px;}
     .draw-color-swatch, .draw-color-custom{width:26px; height:26px;}
+
+    /* Bottom Sheet 展開(75vh)時，繪圖工具面板下半部按鈕（刪除／清空／
+       匯出GeoJSON／地圖截圖／匯入GeoJSON）會被 Sheet 頭部區域疊住或裁切
+       （實機回報）。Sheet 展開高度固定在 --mobile-sheet-full（75% *
+       --vvh），其頂邊界距離畫面頂端 = 25% * --vvh；面板本身 top 偏移是
+       topbar 高度＋安全區＋10px，兩者相減、再扣一點緩衝，才是面板在
+       Sheet 展開時真正不會被蓋住的可用高度。body.mobile-sheet-open 由
+       src/ui/mobileLayout.js 的 initSheetOpenStateSync() 同步。selector
+       用 2 個 class 蓋過上面 .draw-toolbar（1 個 class）的 max-height。 */
+    body.mobile-sheet-open .draw-toolbar{
+      max-height:calc(var(--vvh, 100svh) * 0.25 - env(safe-area-inset-top) - var(--mobile-topbar-h) - 20px);
+      overflow-y:auto; -webkit-overflow-scrolling:touch;
+    }
 
     .locate-toast{top:calc(env(safe-area-inset-top) + var(--mobile-topbar-h) + 10px); right:10px;}
 
@@ -1782,6 +1922,15 @@
 
     /* ---------- 其餘地圖下方浮動列：一律讓到底部工作表 peek 區之上 ---------- */
     .compare-float-item{bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 8px);}
+    /* A 側選圖面板（#pickerPanelA）展開時比按鈕本身高出很多（可達 300+px），
+       原本 left:0 貼齊按鈕左緣，會整片蓋到左下角固定位置的「地圖工具」
+       按鈕（#mobileModeBtn，預設 x:10~58，見上方 #mobileModeBtn 區塊）
+       身上（實機 375x812 量測交集約 x:36~58，已回報為 bug）。這裡只把
+       A 側面板本身往右位移，不動按鈕位置，維持 A/B 視覺對稱；B 側
+       （#pickerPanelB，right:0 貼右下角）不受影響，右下角沒有這顆按鈕。
+       只處理使用者從未拖曳過 #mobileModeBtn 的預設位置，使用者若手動把
+       按鈕拖到別處，這裡不會再重新避讓。 */
+    #pickerPanelA{left:32px;}
     #multiOverlayBar{bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 8px); width:calc(100% - 24px); max-height:32vh;}
     .search-batch-bar{bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 8px); max-width:calc(100% - 24px);}
     #custom-timeline-dock{bottom:calc(var(--mobile-sheet-peek) + env(safe-area-inset-bottom) + 8px); width:calc(100% - 24px);}
@@ -1956,17 +2105,35 @@
     .source-group.mobile-tw-accordion-hidden{display:none;}
 
     /* 大區域／地區 chip 列：視覺比照既有 .avail-year-sort-btn／.segmented
-       語彙，橫向可滑動、不換行。 */
+       語彙，橫向可滑動、不換行。justify-content:space-between 讓「一整排
+       按鈕的自然寬度小於容器寬度」時最後一顆按鈕的右邊界貼齊容器右邊界
+       （跟上方 .segmented／#baseSwitch 等滿版元素的右邊線對齊）；一旦按鈕
+       總寬度超出容器（例如地區多達 7、8 個），space-between 沒有多餘空間
+       可分配，會自動退回原本由左至右排列＋水平捲動，不影響既有設計。 */
     .mobile-tw-macro-row, .mobile-tw-area-row{
-      display:flex; flex-wrap:nowrap; gap:6px; overflow-x:auto;
-      -webkit-overflow-scrolling:touch; padding:2px 2px 4px;
+      display:flex; flex-wrap:nowrap; justify-content:space-between; gap:7px;
+      overflow-x:auto; -webkit-overflow-scrolling:touch; padding:2px 2px 6px;
     }
-    .mobile-tw-macro-btn, .mobile-tw-area-btn{flex-shrink:0; min-height:32px;}
+    .mobile-tw-macro-btn, .mobile-tw-area-btn{
+      flex-shrink:0; min-height:36px; padding:6px 12px; font-size:13px;
+    }
     .mobile-tw-hint{font-size:12px; color:var(--rule); padding:4px 2px; line-height:1.6;}
 
     /* 第三段：buildSourceGroup() 建出來的 .source-group／.source-head／
        .source-body 沿用桌機既有樣式，這裡只是包一層容器，不需要額外規則。 */
     .mobile-tw-sources{display:flex; flex-direction:column; gap:0;}
+
+    /* 防禦性規則：左右比對／多重疊圖的 .layer-picker-panel（約 300px／
+       82vw，比側邊欄窄很多）如果也塞進三段式瀏覽（見
+       src/ui/mobileRegionBrowse.js 的 initMobileCountryBrowse()），地區
+       chip 列改成可換行，不要只靠 .mobile-tw-macro-row/.mobile-tw-area-row
+       原本的 overflow-x:auto 水平捲動——面板本身已經是 overflow-y:auto
+       垂直捲動容器，疊上水平捲動的巢狀捲動體驗較差，且窄面板放不下一整排
+       chip 時用捲動也容易讓使用者以為按鈕被裁切。 */
+    .layer-picker-panel .mobile-tw-macro-row,
+    .layer-picker-panel .mobile-tw-area-row{
+      flex-wrap:wrap; justify-content:flex-start; overflow-x:visible;
+    }
   }
 
   @media (max-width:480px){
