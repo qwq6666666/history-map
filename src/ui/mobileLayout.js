@@ -108,10 +108,17 @@ function relocateSearchBar(isMobile){
 }
 
 /* ---------------------------------------------------------
-   1a. 圖資搜尋列搬移：跟 relocateSearchBar() 對稱，只搬「搜尋列本體」
-   （.layer-search-row，含 #layerSearchInput／#layerSearchClearBtn）這一個
-   節點，#layerSearchPanel（搜尋結果）留在側邊欄 Bottom Sheet 裡不動。
-   跟地址搜尋的 .search-row 搬進同一個 #mobileSearchBar，是否顯示由
+   1a. 圖資搜尋列搬移：跟 relocateSearchBar() 對稱，搬「搜尋列本體」
+   （.layer-search-row，含 #layerSearchInput／#layerSearchClearBtn）與
+   「搜尋結果面板」（#layerSearchPanel）這兩個節點。#layerSearchPanel
+   原本刻意留在側邊欄 Bottom Sheet 裡不動，但這樣會導致輸入框在畫面最
+   上方、結果面板卻在下面可能收合的 Bottom Sheet 裡看不到，只能另外
+   寫 MutationObserver 強制展開整個 Sheet（使用者體感是「一打字整片
+   Bottom Sheet 就蓋住畫面」）。改成比照 #addressSuggest 的浮動卡片
+   模式：兩個節點一起搬進 #mobileSearchBar，靠 style.css 的
+   `#mobileSearchBar .layer-search-panel` 定位成浮在輸入框正下方、自己
+   捲動的懸浮卡片，不再需要強制展開/收合 Bottom Sheet
+   （initLayerSearchResultAutoExpand() 已一併移除）。是否顯示由
    applyMobileSearchMode() 同步的 body class 決定（見 style.css），這裡
    完全不碰 ui/layerSearch.js 的比對邏輯與事件監聽器。
 --------------------------------------------------------- */
@@ -125,11 +132,15 @@ function relocateLayerSearchRow(isMobile){
 
   if(isMobile){
     if(layerRow.parentElement !== mobileBar) mobileBar.appendChild(layerRow);
+    if(layerPanelEl.parentElement !== mobileBar) mobileBar.appendChild(layerPanelEl);
     if(layerInput){
       if(desktopLayerPlaceholder === null) desktopLayerPlaceholder = layerInput.placeholder;
       layerInput.placeholder = MOBILE_LAYER_PLACEHOLDER;
     }
   } else {
+    // 還原順序需為「row 在前、panel 在後」，跟原始 index.html 一致：
+    // 先把 panel 搬回 layerBlock 當錨點，再把 row insert 到它前面。
+    if(layerPanelEl.parentElement !== layerBlock) layerBlock.appendChild(layerPanelEl);
     if(layerRow.parentElement !== layerBlock) layerPanelEl.before(layerRow);
     if(layerInput && desktopLayerPlaceholder !== null) layerInput.placeholder = desktopLayerPlaceholder;
   }
@@ -211,6 +222,16 @@ function scheduleSearchBarCollapse(){
   clearSearchBarCollapseTimer();
   if(!mq.matches) return; // 桌面版沒有這條浮動列，不排程也不用清 class
   searchBarCollapseTimer = setTimeout(()=>{
+    // 收合前先讓目前聚焦中的輸入框失焦：文字內容較長時，部分手機瀏覽器
+    // 對「仍有 focus 的 <input>」有内部最小渲染寬度／捲動到游標位置的
+    // 保底邏輯，即使 CSS 已經把它 width 收到 0，畫面上仍可能殘留一條
+    // 撐開的長條（實機回報）。主動 blur() 讓輸入框先失去焦點（同時收起
+    // 虛擬鍵盤，體驗上也更合理——使用者已經 15 秒沒操作了），再讓 CSS
+    // 收合，兩者都做才能保證乾淨地收成小圓鈕。
+    const active = document.activeElement;
+    if(active === document.getElementById('addressInput') || active === document.getElementById('layerSearchInput')){
+      active.blur();
+    }
     document.getElementById('mobileSearchBar')?.classList.add(SEARCH_BAR_COLLAPSED_CLASS);
   }, SEARCH_BAR_IDLE_MS);
 }
@@ -415,6 +436,7 @@ function initModePopover(){
       const action = optBtn.dataset.helpAction;
       if(action === 'tour') document.getElementById('tourStartBtn')?.click();
       else if(action === 'guide') document.getElementById('guideOpenBtn')?.click();
+      else if(action === 'share') document.getElementById('shareLinkBtn')?.click();
       closePopover();
     });
   });
@@ -551,33 +573,6 @@ function initSearchResultAutoExpand(){
   observer.observe(locationResultEl, { attributes:true, attributeFilter:['style'] });
 }
 
-/* ---------------------------------------------------------
-   3c-2. 跟上面對稱：圖資搜尋出現結果時也自動把 Bottom Sheet 打開到
-   展開態，因為合併輸入框搬到頂部後 #layerSearchPanel 仍留在 Bottom Sheet
-   裡（見 relocateLayerSearchRow()），收合(peek)狀態下使用者看不到搜尋
-   結果。只監看 #layerSearchPanel 的 hidden 屬性（ui/layerSearch.js 既有
-   的顯示/隱藏開關），不碰任何搜尋比對邏輯本身。
---------------------------------------------------------- */
-function initLayerSearchResultAutoExpand(){
-  const layerPanelEl = document.getElementById('layerSearchPanel');
-  const sidebar = document.getElementById('sidebar');
-  if(!layerPanelEl || !sidebar) return;
-
-  let autoOpened = false;
-  const observer = new MutationObserver(()=>{
-    if(!mq.matches) return;
-    const visible = !layerPanelEl.hidden;
-    if(visible && sidebar.classList.contains('collapsed')){
-      expandSidebar();
-      autoOpened = true;
-    } else if(!visible && autoOpened){
-      collapseSidebar();
-      autoOpened = false;
-    }
-  });
-  observer.observe(layerPanelEl, { attributes:true, attributeFilter:['hidden'] });
-}
-
 let everEnteredMobile = false;
 
 /* ---------------------------------------------------------
@@ -667,7 +662,6 @@ export function initMobileLayout(){
   initDraggableModeButton();
   initFloatingOpacityExpand();
   initSearchResultAutoExpand();
-  initLayerSearchResultAutoExpand();
   initSheetOpenStateSync();
   initModeClassSync();
 }
