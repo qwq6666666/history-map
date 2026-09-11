@@ -19,14 +19,21 @@ import { geocodeAddress, reverseGeocode } from '../geocode.js';
 import { buildCategoryList, appendLayerList } from '../uiTree.js';
 import { map } from '../core/map.js';
 import { showLocateToast } from '../features/location.js';
-import { syncActiveLayerItemClasses } from '../core/layerManager.js';
+import { syncActiveLayerItemClasses, preloadOverlayKeys } from '../core/layerManager.js';
 import { findAvailableLayersAt, activateFromSearch, bumpSearchToken, isSearchStale, SEARCH_ZOOM, sortAvailableByYear, groupAvailableByType, splitAvailableByYearKnown, buildCoordInfoElement } from '../features/search.js';
 import { layerKey } from '../data.js';
 import { createCustomTimelineFromSelection, previewLayerOnMap, clearPreviewLayer } from '../features/customTimeline.js';
+import { findPlaceNameCandidates, setActivePlaceNameMatch, clearActivePlaceNameMatch, sourceTypeLabel } from '../features/placeNames.js';
 
-let addressInput, addressSearchBtn, addressSuggestEl, locationResultEl, locationNameEl,
+// 搜尋結果背景預載的圖層筆數上限，見 findAndRenderAvailableLayers() 內說明。
+const SEARCH_PRELOAD_CAP = 20;
+// 地址輸入框自動建議清單的最短觸發字數（含地名今昔對照精確比對與一般地理編碼）。
+const ADDRESS_SUGGEST_MIN_QUERY_LENGTH = 2;
+
+let addressInput, addressSearchBtn, addressSuggestEl, addressInputClearBtn, locationResultEl, locationNameEl,
     layerAvailPanelEl, clearLocationBtn, addressMarkerEl, addressMarkerOverlay, locateSearchBtn,
-    searchBatchBarEl, searchBatchCountEl, searchBatchConfirmBtn;
+    searchBatchBarEl, searchBatchCountEl, searchBatchConfirmBtn,
+    placeNameCardEl, placeNameCardToggleBtn, placeNameCardBodyEl;
 
 // 搜尋結果面板「自訂時間軸多選模式」用的跨 render 生命週期函式指標。
 // renderAvailableLayers() 每次新搜尋都會重新建立區域變數（available／
@@ -54,7 +61,46 @@ function hideSuggest(){
   addressSuggestEl.innerHTML = '';
 }
 
+// 程式化設定 addressInput.value（選定建議清單項目／定位成功／清空）不會
+// 觸發 input 事件，`#addressInputClearBtn` 的顯示狀態要在這些地方手動同步。
+function syncAddressInputClearBtn(){
+  if(addressInputClearBtn) addressInputClearBtn.hidden = (addressInput.value.trim().length === 0);
+}
+
+// #addressSuggest 的桌面版 CSS 是 `position:absolute; top:100%` 相對於
+// `.search-block`（見 style.css），這個定位祖先同時也包住 `#locationResult`——
+// 一旦已經有一次搜尋結果／地名今昔對照卡展開，`.search-block` 的總高度會
+// 被撐得很高，導致建議清單／候選清單整個跑到目前這輪結果面板下方、捲動
+// 範圍外，使用者完全看不到。手機版（`#mobileSearchBar .address-suggest`）
+// 不受影響，因為那邊的定位祖先只是頂部搜尋列，不包含 `#locationResult`，
+// 所以這裡只在桌面版（`#addressSuggest` 還留在 `.search-block` 底下，
+// 不是被搬進 `#mobileSearchBar`）才動態改寫 `top`，改成「輸入框那一列
+// 實際的位置＋高度」，不再依賴會變動的 `.search-block` 總高度；手機版
+// 完全不設 inline style，讓既有的 CSS 規則照常生效。
+function repositionSuggestBelowInputRow(){
+  if(addressSuggestEl.parentElement?.id === 'mobileSearchBar'){
+    addressSuggestEl.style.top = '';
+    return;
+  }
+  const row = document.querySelector('.address-search-row');
+  if(row && row.offsetParent === addressSuggestEl.offsetParent){
+    addressSuggestEl.style.top = `${row.offsetTop + row.offsetHeight + 2}px`;
+  }
+}
+
+// 建立單一「一般地址地理編碼建議」項目 DOM（不負責 append），供
+// renderSuggestList() 與合併清單的 renderMergedSuggestList() 共用，
+// 避免同一段建立邏輯重複兩份。
+function buildAddressSuggestItem(r){
+  const item = document.createElement('div');
+  item.className = 'address-suggest-item';
+  item.textContent = r.display_name;
+  item.addEventListener('click', ()=> selectGeocodeResult(r));
+  return item;
+}
+
 function renderSuggestList(results){
+  repositionSuggestBelowInputRow();
   addressSuggestEl.innerHTML = '';
   if(!results || results.length === 0){
     const empty = document.createElement('div');
@@ -64,13 +110,7 @@ function renderSuggestList(results){
     addressSuggestEl.classList.add('show');
     return;
   }
-  results.forEach(r=>{
-    const item = document.createElement('div');
-    item.className = 'address-suggest-item';
-    item.textContent = r.display_name;
-    item.addEventListener('click', ()=> selectGeocodeResult(r));
-    addressSuggestEl.appendChild(item);
-  });
+  results.forEach(r=> addressSuggestEl.appendChild(buildAddressSuggestItem(r)));
   addressSuggestEl.classList.add('show');
 }
 
@@ -81,6 +121,18 @@ async function runImmediateSearch(){
   const myToken = bumpSearchToken();
   addressSearchBtn.classList.add('loading');
   try{
+    const placeCandidates = await findPlaceNameCandidates(q);
+    if(isSearchStale(myToken)) return;
+    if(placeCandidates.length === 1){
+      hideSuggest();
+      await selectPlaceNameCandidate(placeCandidates[0]);
+      return;
+    }
+    if(placeCandidates.length > 1){
+      renderPlaceNameCandidateList(placeCandidates);
+      return;
+    }
+
     const results = await geocodeAddress(q);
     if(isSearchStale(myToken)) return;
     if(results.length === 1){
@@ -103,6 +155,12 @@ async function runImmediateSearch(){
 // 地址搜尋（selectGeocodeResult）與定位搜尋（locateSearchBtn）最終都會走到這裡，
 // 差別只在座標與地址元件的來源不同（Nominatim 正向地理編碼 vs. 瀏覽器定位+反向地理編碼）。
 export async function showLocationAndFindLayers(lon, lat, label, addr){
+  // 每次重新定位（地址搜尋／目前位置定位／identify pin 的「搜尋涵蓋此點之
+  // 歷史圖層」按鈕）都先清掉上一輪可能殘留的地名今昔對照卡與作用中比對
+  // 結果；只有 selectPlaceNameCandidate() 會在這之後重新設定並顯示。
+  clearActivePlaceNameMatch();
+  hidePlaceNameCard();
+
   const coord = ol.proj.fromLonLat([lon, lat]);
   const view = map.getView();
   view.animate({ center: coord, zoom: Math.max(view.getZoom(), SEARCH_ZOOM), duration: 600 });
@@ -110,6 +168,10 @@ export async function showLocationAndFindLayers(lon, lat, label, addr){
 
   locationResultEl.style.display = 'block';
   locationNameEl.textContent = label;
+  // 存下 Nominatim 回傳的國別碼（小寫），給手機版分頁的
+  // guessRegionFromLastLocation() 比對用，避免地址搜尋固定只查台灣
+  // （見 src/geocode.js 的 countrycodes=tw）卻被拿去誤判成其他國家的地區。
+  locationResultEl.dataset.countryCode = (addr && addr.country_code) ? String(addr.country_code).toLowerCase() : '';
   // 每次重新搜尋都要先移除舊的座標資訊區塊，避免重複搜尋時在卡片內堆疊。
   locationResultEl.querySelector('.coord-info')?.remove();
   locationResultEl.appendChild(buildCoordInfoElement(lat, lon));
@@ -119,9 +181,212 @@ export async function showLocationAndFindLayers(lon, lat, label, addr){
 async function selectGeocodeResult(result){
   hideSuggest();
   addressInput.value = result.display_name;
+  syncAddressInputClearBtn();
   const lon = Number.parseFloat(result.lon);
   const lat = Number.parseFloat(result.lat);
   await showLocationAndFindLayers(lon, lat, result.display_name, result.address || {});
+}
+
+// 地名今昔對照：使用者從候選清單（或唯一命中）選定 place 後，走跟一般
+// 地址搜尋相同的「地圖飛過去＋顯示可用圖層」流程，完成後才記錄目前
+// 作用中的比對結果、渲染「地名今昔對照卡」（showLocationAndFindLayers()
+// 開頭會先清掉上一輪的卡片與作用中比對，這裡要在它之後才重新設定）。
+async function selectPlaceNameCandidate(place){
+  hideSuggest();
+  addressInput.value = place.name;
+  syncAddressInputClearBtn();
+  await showLocationAndFindLayers(place.longitude, place.latitude, place.name, { county: place.county, town: place.town });
+  setActivePlaceNameMatch(place);
+  renderPlaceNameCard(place);
+}
+
+// 地名今昔對照命中多筆候選時的清單，重用既有的 #addressSuggest 容器
+// （見 CLAUDE.md／任務說明：手機版 relocateSearchBar() 只搬移這個既有
+// 節點，另外新增容器會出現「候選清單出現在看不到的地方」的 bug），
+// 用 .place-name-suggest-item 疊加地名專屬樣式與點擊行為區分。
+// 有 export：供 tests/specs/place-name-card-ui.test.mjs 直接呼叫驗證，
+// 純粹讓函式可測試化，不影響原本模組內部呼叫方式或行為。
+// 建立單一「地名今昔對照精確比對」候選項目 DOM（不負責 append），供
+// renderPlaceNameCandidateList() 與合併清單的 renderMergedSuggestList()
+// 共用，避免同一段建立邏輯重複兩份。
+function buildPlaceNameSuggestItem(place){
+  const item = document.createElement('div');
+  item.className = 'address-suggest-item place-name-suggest-item';
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'place-name-suggest-name';
+  nameEl.textContent = place.name;
+
+  const locEl = document.createElement('span');
+  locEl.className = 'place-name-suggest-loc';
+  locEl.textContent = `${place.county}${place.town || ''}`;
+
+  const typeEl = document.createElement('span');
+  typeEl.className = 'place-name-suggest-type';
+  typeEl.textContent = sourceTypeLabel(place.sourceType);
+
+  item.appendChild(nameEl);
+  item.appendChild(locEl);
+  item.appendChild(typeEl);
+  item.addEventListener('click', ()=> selectPlaceNameCandidate(place));
+  return item;
+}
+
+export function renderPlaceNameCandidateList(candidates){
+  repositionSuggestBelowInputRow();
+  addressSuggestEl.innerHTML = '';
+  candidates.forEach(place=> addressSuggestEl.appendChild(buildPlaceNameSuggestItem(place)));
+  addressSuggestEl.classList.add('show');
+}
+
+// 輸入框 debounce handler 專用：同時合併「地名今昔對照精確比對」與
+// 「一般地址地理編碼」兩種建議來源，畫進同一個 #addressSuggest 容器——
+// 地名項目固定排在最上方，地址項目排在下方；兩邊都槓龜時才顯示原本的
+// 空狀態訊息。重用上面兩個 build*SuggestItem() helper，不複製渲染邏輯；
+// renderPlaceNameCandidateList()／renderSuggestList() 這兩支既有 export
+// 函式維持原樣可單獨呼叫（供 runImmediateSearch() 與既有測試使用）。
+// 有 export：供 tests/specs/place-name-card-ui.test.mjs 直接呼叫驗證合併
+// 排序（地名在上、地址在下）與空狀態，純粹讓函式可測試化，不影響原本
+// 模組內部（輸入框 debounce handler）呼叫方式或行為。
+export function renderMergedSuggestList(placeCandidates, geocodeResults){
+  repositionSuggestBelowInputRow();
+  addressSuggestEl.innerHTML = '';
+  const hasPlace = placeCandidates && placeCandidates.length > 0;
+  const hasGeocode = geocodeResults && geocodeResults.length > 0;
+  if(!hasPlace && !hasGeocode){
+    const empty = document.createElement('div');
+    empty.className = 'address-suggest-empty';
+    empty.textContent = '找不到符合的地址，請換個關鍵字試試。';
+    addressSuggestEl.appendChild(empty);
+    addressSuggestEl.classList.add('show');
+    return;
+  }
+  if(hasPlace) placeCandidates.forEach(place=> addressSuggestEl.appendChild(buildPlaceNameSuggestItem(place)));
+  if(hasGeocode) geocodeResults.forEach(r=> addressSuggestEl.appendChild(buildAddressSuggestItem(r)));
+  addressSuggestEl.classList.add('show');
+}
+
+// 隱藏並清空「地名今昔對照卡」，同時把收合狀態重設回收合（目前的預設
+// 初始狀態），確保下次顯示時是乾淨的初始狀態。
+// 有 export：供 tests/specs/place-name-card-ui.test.mjs 直接呼叫驗證，
+// 純粹讓函式可測試化，不影響原本模組內部呼叫方式或行為。
+export function hidePlaceNameCard(){
+  if(!placeNameCardEl) return;
+  placeNameCardEl.hidden = true;
+  placeNameCardBodyEl.innerHTML = '';
+  placeNameCardEl.classList.add('collapsed');
+  placeNameCardToggleBtn?.setAttribute('aria-expanded', 'false');
+  if(placeNameCardToggleBtn) placeNameCardToggleBtn.textContent = '▸';
+}
+
+// 建立單一欄位列（label + value），value 可以是字串或已組好的元素。
+function buildPlaceNameRow(label, valueNode){
+  const row = document.createElement('div');
+  row.className = 'place-name-row';
+  const labelEl = document.createElement('span');
+  labelEl.className = 'place-name-row-label';
+  labelEl.textContent = label;
+  row.appendChild(labelEl);
+  if(typeof valueNode === 'string'){
+    const valueEl = document.createElement('span');
+    valueEl.className = 'place-name-row-value';
+    valueEl.textContent = valueNode;
+    row.appendChild(valueEl);
+  } else {
+    row.appendChild(valueNode);
+  }
+  return row;
+}
+
+// 「地名說明」欄位超過此字元數才截斷＋加「展開全文」按鈕。
+const PLACE_NAME_DESC_TRUNCATE_LENGTH = 100;
+
+// 建立「地名說明」欄位，長文字預設截斷並附「展開全文」按鈕，點擊切換
+// 全文／截斷版本；用一個布林旗標＋重繪這個欄位區塊即可，不用整張卡重繪。
+function buildPlaceNameDescriptionRow(description){
+  const row = document.createElement('div');
+  row.className = 'place-name-row';
+  const labelEl = document.createElement('span');
+  labelEl.className = 'place-name-row-label';
+  labelEl.textContent = '地名說明';
+  row.appendChild(labelEl);
+
+  const valueEl = document.createElement('span');
+  valueEl.className = 'place-name-row-value';
+  row.appendChild(valueEl);
+
+  const needsTruncate = description.length > PLACE_NAME_DESC_TRUNCATE_LENGTH;
+  if(!needsTruncate){
+    valueEl.textContent = description;
+    return row;
+  }
+
+  let expanded = false;
+  const toggleBtn = document.createElement('button');
+  toggleBtn.type = 'button';
+  toggleBtn.className = 'place-name-desc-toggle-btn';
+
+  function renderValue(){
+    valueEl.textContent = expanded ? description : `${description.slice(0, PLACE_NAME_DESC_TRUNCATE_LENGTH)}…`;
+    toggleBtn.textContent = expanded ? '收合' : '展開全文';
+  }
+  toggleBtn.addEventListener('click', ()=>{
+    expanded = !expanded;
+    renderValue();
+  });
+  renderValue();
+  row.appendChild(toggleBtn);
+  return row;
+}
+
+// 渲染「地名今昔對照卡」內容：現名（一定顯示）、別名／舊稱（僅
+// aliases 非空才顯示）、現代位置（一定顯示）、地名說明（僅 description
+// 非空字串才顯示，長文字可展開/收合）、資料來源（一定顯示）。
+// 卡片內容一律完整渲染好，但外層預設收合（避免跟定位結果列、可用圖層
+// 清單一次疊出過長內容），使用者點展開鈕時不需要重新渲染就能看到內容。
+// 有 export：供 tests/specs/place-name-card-ui.test.mjs 直接呼叫驗證，
+// 純粹讓函式可測試化，不影響原本模組內部呼叫方式或行為。
+export function renderPlaceNameCard(place){
+  if(!placeNameCardEl) return;
+  placeNameCardBodyEl.innerHTML = '';
+  placeNameCardEl.hidden = false;
+  placeNameCardEl.classList.add('collapsed');
+  placeNameCardToggleBtn?.setAttribute('aria-expanded', 'false');
+  if(placeNameCardToggleBtn) placeNameCardToggleBtn.textContent = '▸';
+
+  placeNameCardBodyEl.appendChild(buildPlaceNameRow('現名', place.name));
+
+  if(place.aliases && place.aliases.length > 0){
+    const aliasWrap = document.createElement('div');
+    aliasWrap.className = 'place-name-alias-list';
+    place.aliases.forEach(alias=>{
+      const tag = document.createElement('span');
+      tag.className = 'place-name-alias-tag';
+      tag.textContent = alias;
+      aliasWrap.appendChild(tag);
+    });
+    placeNameCardBodyEl.appendChild(buildPlaceNameRow('別名／舊稱', aliasWrap));
+  }
+
+  placeNameCardBodyEl.appendChild(buildPlaceNameRow('現代位置', `${place.county}${place.town || ''}`));
+
+  if(place.description){
+    placeNameCardBodyEl.appendChild(buildPlaceNameDescriptionRow(place.description));
+  }
+
+  placeNameCardBodyEl.appendChild(buildPlaceNameRow('資料來源', `臺灣地區地名資料（${sourceTypeLabel(place.sourceType)}類）`));
+}
+
+// 供 identifyPin.js 落點彈窗「查看地名沿革」按鈕呼叫（由 main.js 接進
+// initIdentifyPin() 的 onViewPlaceNameCard 參數），把目前顯示中的地名
+// 今昔對照卡展開並捲動進畫面。卡片本來就隱藏（例如使用者已清除搜尋、
+// 或目前作用中的比對點跟這次落點不同）時不做任何事。
+export function focusPlaceNameCard(){
+  if(!placeNameCardEl || placeNameCardEl.hidden) return;
+  placeNameCardEl.classList.remove('collapsed');
+  placeNameCardToggleBtn?.setAttribute('aria-expanded', 'true');
+  if(placeNameCardToggleBtn) placeNameCardToggleBtn.textContent = '▾';
+  placeNameCardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function getCurrentPositionAsync(){
@@ -154,6 +419,7 @@ async function handleLocateSuccess(pos, myToken){
   if(isSearchStale(myToken)) return;
 
   addressInput.value = label;
+  syncAddressInputClearBtn();
   await showLocationAndFindLayers(lon, lat, label, addr);
 }
 
@@ -207,6 +473,15 @@ async function findAndRenderAvailableLayers(lon, lat, addr){
   if(result.status === 'stale') return;
 
   renderAvailableLayers(result.available, result.totalChecked);
+
+  // 逐筆確認過真的有資料的圖層，背景預先建立（見 core/layerManager.js
+  // preloadOverlayKeys），使用者從清單點開時圖磚往往已經在下載，減少
+  // 切換等待感。跟 timelineMode.js 同一套機制，但這裡命中筆數可能遠多於
+  // 時間軸模式（涵蓋所有類型來源，不只 sinica 一種），故意設一個上限，
+  // 避免熱門地點一次背景暖機幾十張圖層、佔滿頻寬又把 layerCache 洗爆。
+  preloadOverlayKeys(
+    result.available.slice(0, SEARCH_PRELOAD_CAP).map(c => layerKey(c.src, c.layer))
+  );
 }
 
 // 篩選單一 group 底下「目前可用」的圖層；從 renderAllView() 的巢狀
@@ -569,10 +844,19 @@ export function initSearchUI(){
   addressInput = document.getElementById('addressInput');
   addressSearchBtn = document.getElementById('addressSearchBtn');
   addressSuggestEl = document.getElementById('addressSuggest');
+  addressInputClearBtn = document.getElementById('addressInputClearBtn');
   locationResultEl = document.getElementById('locationResult');
   locationNameEl = document.getElementById('locationName');
   layerAvailPanelEl = document.getElementById('layerAvailPanel');
   clearLocationBtn = document.getElementById('clearLocationBtn');
+  placeNameCardEl = document.getElementById('placeNameCard');
+  placeNameCardToggleBtn = document.getElementById('placeNameCardToggle');
+  placeNameCardBodyEl = document.getElementById('placeNameCardBody');
+  placeNameCardToggleBtn.addEventListener('click', ()=>{
+    const collapsed = placeNameCardEl.classList.toggle('collapsed');
+    placeNameCardToggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    placeNameCardToggleBtn.textContent = collapsed ? '▸' : '▾';
+  });
 
   searchBatchBarEl = document.getElementById('searchBatchBar');
   searchBatchCountEl = document.getElementById('searchBatchCount');
@@ -594,22 +878,39 @@ export function initSearchUI(){
   addressInput.addEventListener('input', ()=>{
     exitSelectionModeFn?.();
     const q = addressInput.value.trim();
+    if(addressInputClearBtn) addressInputClearBtn.hidden = (q.length === 0);
     if(runtime.addressDebounceTimer) clearTimeout(runtime.addressDebounceTimer);
-    if(q.length < 3){ hideSuggest(); return; }
+    if(q.length < ADDRESS_SUGGEST_MIN_QUERY_LENGTH){ hideSuggest(); return; }
     runtime.addressDebounceTimer = setTimeout(async ()=>{
       const myToken = bumpSearchToken();
       try{
-        const results = await geocodeAddress(q);
+        // 同時查地名今昔對照精確比對與一般地址地理編碼，合併渲染進同一個
+        // 建議清單（地名項目在上、地址項目在下），讓使用者直接點建議清單
+        // 裡的地名項目也能觸發地名今昔對照卡，不再只有 Enter／按搜尋鈕
+        // 走的 runImmediateSearch() 才有這個效果。
+        const [placeCandidates, geocodeResults] = await Promise.all([
+          findPlaceNameCandidates(q),
+          geocodeAddress(q)
+        ]);
         if(isSearchStale(myToken)) return;
-        renderSuggestList(results);
+        renderMergedSuggestList(placeCandidates, geocodeResults);
       }catch(e){
-        // 同上（see selectGeocodeResult 附近的說明）：地理編碼請求失敗時
-        // 靜默隱藏建議清單即可，使用者輸入過程中不需要跳錯誤訊息；
-        // 仍記錄到 console 方便除錯。
-        console.warn('地址輸入自動建議的地理編碼失敗：', e);
+        // 同上（see selectGeocodeResult 附近的說明）：地名比對／地理編碼
+        // 請求失敗時靜默隱藏建議清單即可，使用者輸入過程中不需要跳錯誤
+        // 訊息打斷；仍記錄到 console 方便除錯。
+        console.warn('地址輸入自動建議的比對／地理編碼失敗：', e);
         if(!isSearchStale(myToken)) hideSuggest();
       }
     }, 550);
+  });
+
+  addressInputClearBtn?.addEventListener('click', ()=>{
+    // 只清「正在輸入的文字」，不連帶清除已完成的搜尋結果（locationResult／
+    // layerAvailPanel／placeNameCard），那些是 clearLocationBtn 的職責。
+    addressInput.value = '';
+    addressInputClearBtn.hidden = true;
+    hideSuggest();
+    addressInput.focus();
   });
 
   addressSearchBtn.addEventListener('click', runImmediateSearch);
@@ -646,12 +947,15 @@ export function initSearchUI(){
     clearSelectionFn = null;
     confirmCustomTimelineFn = null;
     bumpSearchToken(); // 讓仍在進行中的逐筆確認直接放棄，不再更新畫面
+    clearActivePlaceNameMatch();
+    hidePlaceNameCard();
     hideAddressMarker();
     locationResultEl.style.display = 'none';
     layerAvailPanelEl.innerHTML = '';
     layerAvailPanelEl.classList.remove('selection-mode');
     searchBatchBarEl?.classList.remove('show');
     addressInput.value = '';
+    syncAddressInputClearBtn();
     hideSuggest();
   });
 }
