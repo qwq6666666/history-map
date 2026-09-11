@@ -44,9 +44,20 @@ class FakeClassList {
   constructor(node){ this._node = node; }
   add(c){ this._node._classes.add(c); }
   remove(c){ this._node._classes.delete(c); }
+  // 比照真實瀏覽器 DOMTokenList.toggle()：回傳 boolean（toggle 後該
+  // class 是否存在），不能只做操作不回傳值——search.js 的地名今昔對照卡
+  // 收合按鈕 handler（`const collapsed = classList.toggle('collapsed')`）
+  // 直接依賴這個回傳值判斷目前是展開還是收合，回傳 undefined 會讓每次
+  // 點擊都被判定成同一個（falsy）分支，測試測不出真正的 toggle 行為。
   toggle(c, force){
-    if(force === undefined){ this._node._classes.has(c) ? this._node._classes.delete(c) : this._node._classes.add(c); }
-    else { force ? this._node._classes.add(c) : this._node._classes.delete(c); }
+    if(force === undefined){
+      if(this._node._classes.has(c)){ this._node._classes.delete(c); return false; }
+      this._node._classes.add(c);
+      return true;
+    }
+    if(force){ this._node._classes.add(c); return true; }
+    this._node._classes.delete(c);
+    return false;
   }
   contains(c){ return this._node._classes.has(c); }
 }
@@ -124,6 +135,14 @@ export class FakeNode {
     return results;
   }
   scrollIntoView(){}
+  select(){}
+  // 真的瀏覽器版本會真的搬移鍵盤焦點；這裡只需要「存在、可以被呼叫」，
+  // 讓 features/multiOverlay.js／ui/layerSearch.js／ui/mobileLayout.js／
+  // ui/search.js 這幾處呼叫 input.focus()／.blur() 的程式碼在測試環境下
+  // 不會因為方法不存在而噴例外。比照上面 scrollIntoView()／select() 的
+  // 既有寫法（空方法即可，不需要真的模擬焦點狀態）。
+  focus(){}
+  blur(){}
   getBoundingClientRect(){ return { height: 20, width: Number.parseFloat(this.attrs.width || 800), left: 0 }; }
   // 沒有真的排版引擎，clientWidth 跟 getBoundingClientRect().width 用同一份
   // 假設（attrs.width 可指定，否則預設 800），供 features/compareMode.js 的
@@ -134,8 +153,11 @@ export class FakeNode {
   get innerHTML(){ return this._innerHTML || ''; }
 }
 
-function matchesSelector(node, sel){
-  let rest = sel.trim();
+// 比對「單一 compound selector」（例如 `.foo`、`div`、`.foo[data-x="y"]`），
+// 不含空白／子孫選擇器。原本 matchesSelector() 的完整實作，改名讓下面的
+// matchesSelector() 可以疊加子孫選擇器（空白分隔）的比對邏輯。
+function matchesCompound(node, compoundSel){
+  let rest = compoundSel.trim();
   if(rest.startsWith('.')){
     const m = rest.match(/^\.([a-zA-Z0-9_-]+)/);
     if(!m || !node._classes || !node._classes.has(m[1])) return false;
@@ -158,6 +180,27 @@ function matchesSelector(node, sel){
     return node.dataset?.[key] !== undefined;
   }
   return false;
+}
+
+// 支援簡單的「子孫選擇器」：用空白分隔多個 compound selector（例如
+// features/multiOverlay.js 的
+// `.source-group[data-source-id="X"] .layer-item[data-layer-id="Y"]`）。
+// 語意跟真的 CSS 子孫選擇器一致——最後一段要比對到節點自己，前面每一段
+// 依序往上層祖先找（不要求緊鄰的父層）。刻意不支援 ">"（直接子代）或
+// `:scope` 等虛擬選擇器／逗號並列選擇器列表，這幾種目前沒有測試依賴
+// 到比對結果，維持原本「一律不比對、回傳 false」的行為，不擴充。
+function matchesSelector(node, sel){
+  const parts = sel.trim().split(/\s+/).filter(Boolean);
+  if(parts.length <= 1) return matchesCompound(node, sel.trim());
+  if(!matchesCompound(node, parts[parts.length - 1])) return false;
+  let ancestor = node.parentElement;
+  let partIdx = parts.length - 2;
+  while(partIdx >= 0){
+    if(!ancestor) return false;
+    if(matchesCompound(ancestor, parts[partIdx])) partIdx--;
+    ancestor = ancestor.parentElement;
+  }
+  return true;
 }
 
 const elementCache = {};
@@ -231,6 +274,22 @@ else { globalThis.navigator = { geolocation: null }; }
 globalThis.alert = (msg) => {};
 globalThis.confirm = () => true;
 globalThis.prompt = () => '';
+
+// 假 location：features/shareLink.js 用 location.origin/pathname 組分享
+// 網址、用 location.search 還原狀態。用純物件（不是真的 URL/Location
+// API）故意讓測試檔案可以直接 `location.search = '...'` 賦值模擬「使用者
+// 打開帶參數的分享連結」，不需要另外提供 navigate/assign 之類的方法。
+globalThis.location = {
+  origin: 'https://example.local',
+  pathname: '/',
+  search: '',
+};
+
+// 假 document.execCommand：真的瀏覽器版本會操作使用者當下的文字選取
+// 範圍，這裡固定回傳 true 模擬「複製成功」，讓 features/shareLink.js／
+// features/location.js／features/search.js 的 navigator.clipboard 不可用
+// 時退回 document.execCommand('copy') 這條路徑在測試環境下也能被驗證。
+globalThis.document.execCommand = () => true;
 
 // Node 沒有全域 requestAnimationFrame；src/ 底下若用到（例如
 // ui/search.js 的 buildSelectionList() 用來觸發進場動畫 class），
@@ -356,6 +415,11 @@ class FakeMap {
   constructor(opts){
     this.opts = opts;
     this._center = opts.view?.opts ? opts.view.opts.center : [120.9, 23.7];
+    // 跟 _center 一樣從 View 建構參數帶入初始值、setZoom() 真的會改動它，
+    // 讓 features/shareLink.js 這類「讀目前縮放層級是否偏離預設值」的
+    // 邏輯在測試環境下可以被驗證（先前固定回傳 8、setZoom 是空方法，
+    // 沒辦法測出「有改動縮放」的分支）。
+    this._zoom = opts.view?.opts?.zoom !== undefined ? opts.view.opts.zoom : 8;
     this._moveendHandlers = [];
     this._interactions = [];
     this._layers = [];
@@ -364,7 +428,8 @@ class FakeMap {
   getView(){
     const self = this;
     return {
-      fit(){}, setCenter(c){ self._center = c; }, setZoom(){}, getZoom(){ return 8; },
+      fit(){}, setCenter(c){ self._center = c; },
+      setZoom(z){ self._zoom = z; }, getZoom(){ return self._zoom; },
       animate(){}, getCenter(){ return self._center; }
     };
   }
